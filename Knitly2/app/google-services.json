@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "464389724786",
+    "firebase_url": "https://knitly-e9409-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "knitly-e9409",
+    "storage_bucket": "knitly-e9409.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:464389724786:android:2a3d394b99bd830acac0eb",
+        "android_client_info": {
+          "package_name": "com.hotelka.knitlyWants"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "464389724786-0rbhau92l148e8r4mutmudkovr05b7kc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.hotelka.knitlyWants",
+            "certificate_hash": "0663fbe4fe7007704528c674056b1ddeebc78771"
+          }
+        },
+        {
+          "client_id": "464389724786-lm806jqrkfbjju85vsnlkudc66k5dr5n.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDSmDaCTGT7Ik3cvJhXlZWYNtgeMbBWEvs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "464389724786-lm806jqrkfbjju85vsnlkudc66k5dr5n.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
