@@ -2,12 +2,18 @@ package com.hotelka.knitlyWants.FirebaseUtils
 
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 import com.hotelka.knitlyWants.Data.Blog
+import com.hotelka.knitlyWants.Data.Comment
 import com.hotelka.knitlyWants.Data.Likes
 import com.hotelka.knitlyWants.Data.Project
 import com.hotelka.knitlyWants.Data.ProjectsArchive
 import com.hotelka.knitlyWants.Data.UserData
+import com.hotelka.knitlyWants.blogCurrent
 import com.hotelka.knitlyWants.currentProjectInProgress
 import com.hotelka.knitlyWants.editableProject
 import com.hotelka.knitlyWants.navController
@@ -41,12 +47,15 @@ class FirebaseDB {
             navController.popBackStack()
 
         }
+
         fun updateBlog(blog: Blog) {
             refBlogs.child(blog.projectData!!.projectId.toString()).setValue(blog)
+            blogCurrent = null
             navController.popBackStack()
 
         }
-        fun storeBlog(blog: Blog, uniqueUUID: String){
+
+        fun storeBlog(blog: Blog, uniqueUUID: String) {
             refBlogs.child(uniqueUUID).setValue(blog)
             refUsers.child(FirebaseAuth.getInstance().currentUser!!.uid).child(BLOGS).get()
                 .addOnSuccessListener {
@@ -54,6 +63,7 @@ class FirebaseDB {
                     navController.popBackStack()
                 }
         }
+
         fun storeProjectCrocheting(project: Project, uniqueUUID: String) {
             refProjects.child(uniqueUUID).setValue(project)
             refUsers.child(FirebaseAuth.getInstance().currentUser!!.uid).child(PROJECTS).get()
@@ -71,19 +81,96 @@ class FirebaseDB {
                 )
         }
 
+        fun sendReviewBlog(projectId: String, reviews: Int) {
+            refBlogs.child(projectId).child("projectData").child("reviews")
+                .setValue(
+                    reviews.plus(1)
+                )
+        }
+
+        fun getComments(
+            reference: DatabaseReference,
+            id: String,
+            onDataLoaded: (MutableList<Comment>) -> Unit
+        ) {
+            var comments = mutableListOf<Comment>()
+            reference.child(id).child("comments")
+                .addValueEventListener(object : ValueEventListener {
+                    override fun onDataChange(snapshot: DataSnapshot) {
+                        comments.clear()
+                        for (comment in snapshot.children) {
+                            var comment = comment.getValue(Comment::class.java)!!
+                            comments.add(comment)
+                        }
+                        onDataLoaded(comments)
+                    }
+
+                    override fun onCancelled(error: DatabaseError) {
+
+                    }
+
+                })
+        }
+
+        fun sendComment(comment: Comment, id: String, typeDbRef: DatabaseReference) {
+            typeDbRef.child(id).child("comments").child(comment.id.toString()).setValue(comment)
+        }
+
+        fun deleteComment(comment: Comment, id: String, typeDbRef: DatabaseReference) {
+            typeDbRef.child(id).child("comments").child(comment.id.toString()).removeValue()
+        }
+
+        fun sendLikeComment(commentId: String, id: String, typeDbRef: DatabaseReference) {
+            typeDbRef.child(id).child("comments").child(commentId).child("likes").get()
+                .addOnSuccessListener {
+                    var like = it.getValue<Likes>(Likes::class.java)!!
+                    if (like.users?.contains(userData.value.userId.toString()) == true) {
+                        typeDbRef.child(id).child("comments").child(commentId).child("likes")
+                            .child("total")
+                            .setValue(
+                                like.total?.minus(1)
+                            )
+                        typeDbRef.child(id).child("comments").child(commentId).child("likes")
+                            .child("users").get().addOnSuccessListener {
+                                it.children.forEach {
+                                    if (it.value == userData.value.userId) {
+                                        it.ref.removeValue()
+                                    }
+                                }
+                            }
+                    } else {
+                        typeDbRef.child(id).child("comments").child(commentId).child("likes")
+                            .child("total")
+                            .setValue(
+                                like.total?.plus(1)
+                            )
+                        var map: MutableMap<String?, Any> = LinkedHashMap()
+                        map[like.total?.plus(1).toString()] = userData.value.userId
+                        typeDbRef.child(id).child("comments").child(commentId).child("likes")
+                            .child("users")
+                            .updateChildren(map)
+                        like.apply {
+                            total = total?.plus(1)
+                            users = users?.plus(userData.value.userId)
+                        }
+                    }
+                }
+        }
+
         fun sendLike(projectId: String, like: Likes): Likes {
             if (like.users?.contains(userData.value.userId.toString()) == true) {
                 refProjects.child(projectId).child("projectData").child("likes").child("total")
                     .setValue(
                         like.total?.minus(1)
                     )
-                refProjects.child(projectId).child("projectData").child("likes").child("users").get().addOnSuccessListener{
-                    it.children.forEach {
-                        if (it.value == userData.value.userId){
-                            it.ref.removeValue()
+                refProjects.child(projectId).child("projectData").child("likes").child("users")
+                    .get().addOnSuccessListener {
+                        it.children.forEach {
+                            if (it.value == userData.value.userId) {
+                                it.ref.removeValue()
+                            }
                         }
                     }
-                }
             } else {
                 refProjects.child(projectId).child("projectData").child("likes").child("total")
                     .setValue(
@@ -100,19 +187,21 @@ class FirebaseDB {
             }
             return like
         }
+
         fun sendLikeBlog(projectId: String, like: Likes): Likes {
             if (like.users?.contains(userData.value.userId.toString()) == true) {
                 refBlogs.child(projectId).child("projectData").child("likes").child("total")
                     .setValue(
                         like.total?.minus(1)
                     )
-                refBlogs.child(projectId).child("projectData").child("likes").child("users").get().addOnSuccessListener{
-                    it.children.forEach {
-                        if (it.value == userData.value.userId){
-                            it.ref.removeValue()
+                refBlogs.child(projectId).child("projectData").child("likes").child("users").get()
+                    .addOnSuccessListener {
+                        it.children.forEach {
+                            if (it.value == userData.value.userId) {
+                                it.ref.removeValue()
+                            }
                         }
                     }
-                }
                 like.apply {
                     total = total?.minus(1)
                     users = users?.minus(userData.value.userId)
@@ -137,7 +226,7 @@ class FirebaseDB {
         fun createUser(currentUser: FirebaseUser) {
             val parsedUser = UserData(
                 userId = currentUser.uid,
-                username = "guest" + RandomStringUtils.randomAlphanumeric(10),
+                username = "guest_" + RandomStringUtils.randomAlphanumeric(10),
                 email = currentUser.email.toString(),
                 profilePictureUrl = currentUser.photoUrl.toString(),
                 bio = ""
@@ -145,13 +234,31 @@ class FirebaseDB {
             refUsers.child(currentUser.uid).setValue(parsedUser)
         }
 
-        fun deleteProject(id: String?) {
+        fun deleteProject(id: String?, authorID: String?) {
             id?.let { refProjects.child(it).removeValue() }
             refProjectsInProgress.get().addOnSuccessListener {
                 for (child in it.children) {
                     id?.let { path ->
                         child.child(path).ref.removeValue().addOnSuccessListener { }
 
+                    }
+                }
+            }
+            refUsers.child(authorID.toString()).child(PROJECTS).get().addOnSuccessListener {
+                for (child in it.children) {
+                    if (child.value == id) {
+                        child.ref.removeValue()
+                    }
+                }
+            }
+        }
+
+        fun deleteBlog(id: String?, authorID: String?) {
+            id?.let { refBlogs.child(it).removeValue() }
+            refUsers.child(authorID.toString()).child(BLOGS).get().addOnSuccessListener {
+                for (child in it.children) {
+                    if (child.value == id) {
+                        child.ref.removeValue()
                     }
                 }
             }
@@ -205,15 +312,64 @@ class FirebaseDB {
 
         }
 
-        fun checkExistUser(id: String, onExist:()-> Unit, onNotExist:() -> Unit) {
-            refUsers.child(id).get().addOnSuccessListener{snapshot ->
-                if (snapshot.exists()){
+        fun checkExistUser(
+            id: String,
+            onExist: () -> Unit,
+            onNotExist: () -> Unit,
+            rememberId: (String) -> Unit
+        ) {
+            refUsers.child(id).get().addOnSuccessListener { snapshot ->
+                if (snapshot.exists()) {
                     onExist()
                 } else {
                     onNotExist()
                 }
+                rememberId(id)
             }
         }
 
+        fun getUser(id: String, onLoaded: (UserData) -> Unit) {
+            refUsers.child(id).get().addOnSuccessListener {
+                val user = it.getValue(UserData::class.java)
+                user?.let { p1 -> onLoaded(p1) }
+            }
+        }
+        fun updateUser(map: MutableMap<String, Any>){
+            refUsers.child(userData.value.userId).updateChildren(map)
+            navController.popBackStack()
+        }
+
+        fun subscribe(authorId: String?, follows: Boolean, onDone: () -> Unit) {
+            refUsers.child(authorId.toString()).child("subscribers").get().addOnSuccessListener {
+                if (!follows) {
+                    it.child(it.childrenCount.toString()).ref.setValue(userData.value.userId)
+                } else {
+                    for (child in it.children) {
+                        if (child.value == userData.value.userId) {
+                            child.ref.removeValue()
+                            break
+                        }
+                    }
+                }
+
+            }
+            refUsers.child(userData.value.userId).child("subscriptions").get()
+                .addOnSuccessListener {
+                    if (!follows) {
+                        it.child(it.childrenCount.toString()).ref.setValue(authorId.toString())
+                            .addOnSuccessListener {
+                                onDone()
+                            }
+                    } else {
+                        for (child in it.children) {
+                            if (child.value == authorId.toString()) {
+                                child.ref.removeValue()
+                                onDone()
+                                break
+                            }
+                        }
+                    }
+                }
+        }
     }
 }

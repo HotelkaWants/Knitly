@@ -62,21 +62,15 @@ import com.hotelka.knitlyWants.userData
 fun ProjectContainer(project: Project) {
     var context = LocalContext.current
     var started by remember { mutableStateOf(context.getString(R.string.startProject)) }
-    FirebaseDB.refProjectsInProgress.child(userData.value.userId).addValueEventListener(object : ValueEventListener{
-        override fun onDataChange(snapshot: DataSnapshot) {
-            snapshot.children.forEach{ if (it.key == project.projectData?.projectId) started = context.getString(R.string.started)}
-        }
-
-        override fun onCancelled(error: DatabaseError) {
-
-        }
-    })
+    FirebaseDB.refProjectsInProgress.child(userData.value.userId).get().addOnSuccessListener{snapshot ->
+        snapshot.children.forEach{ if (it.key == project.projectData?.projectId) started = context.getString(R.string.started)}
+    }
     Card(
         elevation = CardDefaults.cardElevation(10.dp),
         modifier = Modifier
             .wrapContentWidth()
             .clickable {
-                FirebaseDB.sendReview(project.projectData!!.projectId!!, project.projectData.reviews)
+                FirebaseDB.sendReview(project.projectData?.projectId!!, project.projectData.reviews)
                 projectCurrent = project
                 navController.navigate("projectOverview")
             }
@@ -108,7 +102,7 @@ fun ProjectContainer(project: Project) {
                             .padding(start = 5.dp, top = 5.dp),
                         color = textColor,
                         fontSize = 15.sp,
-                        text = "${project.projectData!!.author}, ${project.projectData.date}",
+                        text = "${project.projectData?.author}, ${project.projectData?.date}",
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Bold,
                     )
@@ -117,7 +111,7 @@ fun ProjectContainer(project: Project) {
                             .padding(start = 5.dp),
                         color = textColor,
                         fontSize = 15.sp,
-                        text = project.projectData.title!!,
+                        text = project.projectData?.title!!,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Bold,
                     )
@@ -214,7 +208,11 @@ fun ProjectContainer(project: Project) {
                                         project.projectData.likes
                                     )
                                 },
-                            colorFilter = ColorFilter.tint(textColor)
+                            colorFilter = if (project.projectData.likes.users?.contains(
+                                    userData.value.userId
+                                ) == true
+                            ) ColorFilter.tint(headers_activeElement)
+                            else ColorFilter.tint(Color.Gray)
                         )
                         Text(
                             text = project.projectData.likes.total.toString(),
@@ -238,7 +236,7 @@ fun ProjectContainer(project: Project) {
             ) {
 
                 AsyncImage(
-                    model = project.projectData!!.cover.toString(),
+                    model = project.projectData?.cover.toString(),
                     contentScale = ContentScale.Crop,
                     contentDescription = "Scheme Cover",
                     modifier = Modifier

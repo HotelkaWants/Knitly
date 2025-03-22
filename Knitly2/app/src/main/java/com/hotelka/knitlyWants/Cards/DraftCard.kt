@@ -17,11 +17,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -37,14 +35,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Color.Companion.Transparent
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.TextStyle
@@ -54,12 +49,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import coil3.compose.rememberAsyncImagePainter
+import com.hotelka.knitlyWants.Data.Blog
 import com.hotelka.knitlyWants.Data.Category
 import com.hotelka.knitlyWants.Data.Project
-import com.hotelka.knitlyWants.Data.UserData
-import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB
 import com.hotelka.knitlyWants.R
+import com.hotelka.knitlyWants.editableBlog
 import com.hotelka.knitlyWants.editableProject
 import com.hotelka.knitlyWants.navController
 import com.hotelka.knitlyWants.ui.theme.accent_secondary
@@ -70,8 +64,12 @@ import com.hotelka.knitlyWants.ui.theme.white
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Preview
-fun DraftCard(project: Project? = Project()) {
+fun DraftCard(project: Project? = Project(), blog: Blog? = Blog()) {
     var expanded by remember { mutableStateOf(false) }
+    var projectData by remember { mutableStateOf(
+        if (project != null) project.projectData
+        else blog?.projectData
+    ) }
     Card(
         modifier = Modifier
             .padding(7.dp)
@@ -89,9 +87,9 @@ fun DraftCard(project: Project? = Project()) {
                         .background(white)
                         .height(250.dp)
                         .width(250.dp),
-                    model = if (project!!.projectData!!.cover!!.isNotEmpty() == true) project.projectData.cover
+                    model = if (projectData!!.cover!!.isNotEmpty() == true) projectData!!.cover
                     else R.drawable.baseline_photo_camera_24,
-                    colorFilter = if (project.projectData.cover.isNotEmpty() == true) null
+                    colorFilter = if (projectData!!.cover!!.isNotEmpty() == true) null
                     else ColorFilter.tint(accent_secondary),                    contentScale = ContentScale.Crop,
                     contentDescription = "Scheme Cover"
                 )
@@ -107,7 +105,7 @@ fun DraftCard(project: Project? = Project()) {
                     horizontalAlignment = Alignment.Start
                 ) {
                     Text(
-                        text = project.projectData.title!!,
+                        text = projectData!!.title!!,
                         modifier = Modifier
                             .width(150.dp),
                         fontSize = 24.sp,
@@ -128,7 +126,7 @@ fun DraftCard(project: Project? = Project()) {
                             colorFilter = ColorFilter.tint(textColor)
                         )
                         Text(
-                            text = stringResource(R.string.lastUpdate) + project.projectData.date,
+                            text = stringResource(R.string.lastUpdate) + projectData!!.date,
                             fontSize = 12.sp,
                             modifier = Modifier
                                 .align(Alignment.CenterVertically)
@@ -168,7 +166,7 @@ fun DraftCard(project: Project? = Project()) {
 
                 ) {
                     Column {
-                        if (project?.category != Category.Blog) {
+                        if (blog == null) {
                             Row(
                                 modifier = Modifier.padding(10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -192,7 +190,7 @@ fun DraftCard(project: Project? = Project()) {
 
                         Text(
                             modifier = Modifier.padding(horizontal = 5.dp),
-                            text = project?.projectData!!.description,
+                            text = projectData!!.description,
                             color = textColor,
                             fontSize = 16.sp,
                             style = LocalTextStyle.current.merge(
@@ -207,7 +205,8 @@ fun DraftCard(project: Project? = Project()) {
                                 .fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = headers_activeElement),
                             onClick = {
-                                editableProject = project
+                                if (project != null) {editableProject = project; editableBlog = null}
+                                else {editableBlog = blog; editableProject = null}
                                 navController.navigate("createProject")
                             }
                         ) { Text(text = stringResource(R.string.edit)) }

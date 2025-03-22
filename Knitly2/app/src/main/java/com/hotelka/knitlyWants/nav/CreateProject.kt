@@ -18,6 +18,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -33,6 +34,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Done
@@ -49,14 +51,18 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Color.Companion.DarkGray
+import androidx.compose.ui.graphics.Color.Companion.Gray
 import androidx.compose.ui.graphics.Color.Companion.Transparent
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.TextStyle
@@ -67,6 +73,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import coil3.compose.rememberAsyncImagePainter
+import com.attafitamim.krop.core.crop.*
+import com.attafitamim.krop.ui.ImageCropperDialog
 import com.hotelka.knitlyWants.Data.Blog
 import com.hotelka.knitlyWants.Data.Category
 import com.hotelka.knitlyWants.Data.Category.Companion.Crocheting
@@ -81,9 +90,9 @@ import com.hotelka.knitlyWants.R
 import com.hotelka.knitlyWants.Supbase.getData
 import com.hotelka.knitlyWants.Supbase.getFileFromUri
 import com.hotelka.knitlyWants.Supbase.uploadFile
-import com.hotelka.knitlyWants.Supbase.url
 import com.hotelka.knitlyWants.SupportingDatabase.RoomDatabase
 import com.hotelka.knitlyWants.editableProject
+import com.hotelka.knitlyWants.imageBitmapToByteArray
 import com.hotelka.knitlyWants.navController
 import com.hotelka.knitlyWants.ui.theme.CustomFloatingActionButton
 import com.hotelka.knitlyWants.ui.theme.LoadingAnimation
@@ -99,6 +108,7 @@ import com.hotelka.knitlyWants.ui.theme.white
 import com.hotelka.knitlyWants.userData
 import kotlinx.coroutines.launch
 import org.apache.commons.lang3.RandomStringUtils
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.lang.Exception
@@ -113,7 +123,13 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
     val context = LocalContext.current
     var deleteProjectDialog by remember { mutableStateOf(false) }
 
-    var title by remember { mutableStateOf(if (currentProject != null) currentProject.projectData!!.title!! else "") }
+    var title by remember { mutableStateOf(if (currentProject != null) currentProject.projectData!!.title else if (blog_ != null) blog_.projectData!!.title else "") }
+    var description by remember { mutableStateOf(if (currentProject != null) currentProject.projectData!!.description else if (blog_ != null) blog_.projectData!!.description else "") }
+    var category by remember { mutableStateOf(if (currentProject != null) currentProject.category else Category.Blog) }
+    var credits by remember { mutableStateOf(if (currentProject != null) currentProject.credits else if (blog_ != null) blog_.credits else "") }
+    var initialImageUri =
+        if (currentProject != null) currentProject.projectData?.cover else blog_?.projectData?.cover
+
     var tool by remember {
         mutableStateOf(
             if (currentProject != null) currentProject.tool!!.replace(
@@ -123,16 +139,12 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
         )
     }
     var yarns by remember { mutableStateOf(if (currentProject != null) currentProject.yarns!! else "") }
-    var description by remember { mutableStateOf(if (currentProject != null) currentProject.projectData!!.description else "") }
-    var category by remember { mutableStateOf(if (currentProject != null) currentProject.category!! else Crocheting) }
-    var imageUri by remember { mutableStateOf<String?>(if (currentProject != null) currentProject.projectData!!.cover else if (blog_ != null) blog_.projectData!!.cover else "") }
-    var initialImageUri =
-        if (currentProject != null) currentProject.projectData?.cover else blog_?.projectData?.cover
-
     var expandedCategories by remember { mutableStateOf(false) }
     var expandedSave by remember { mutableStateOf(false) }
     var saveEnabled by remember { mutableStateOf(false) }
     var expandedRows = remember { mutableStateListOf<Boolean>() }
+
+    var creditsInfoExpanded by remember { mutableStateOf(false) }
 
     var details = remember { mutableStateListOf<Detail>() }
     if (currentProject != null) {
@@ -162,13 +174,55 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
         blog = blog_
         blogImages.addAll(blog.additionalImages)
     }
-
+    val imageCropper = rememberImageCropper()
+    val composableScope = rememberCoroutineScope()
+    var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    val cropState = imageCropper.cropState
+    if (cropState != null) ImageCropperDialog(
+        state = cropState,
+        dialogPadding = PaddingValues(top = 0.dp, start = 0.dp, end = 0.dp, bottom = 80.dp),
+        topBar = {
+            TopAppBar(
+                title = {},
+                navigationIcon = {
+                    IconButton(onClick = { cropState.done(accept = false) }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = white)
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { cropState.reset() }) {
+                        Icon(painterResource(R.drawable.restore), null, tint = white)
+                    }
+                    IconButton(
+                        onClick = { cropState.done(accept = true) },
+                        enabled = !cropState.accepted
+                    ) {
+                        Icon(Icons.Default.Done, null, tint = white)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = textColor)
+            )
+        }
+    )
     val launcher =
         rememberLauncherForActivityResult(contract = ActivityResultContracts.GetContent()) { uri ->
-            imageUri = if (uri != null) uri.toString() else ""
+            if (uri != null) {
+                composableScope.launch {
+                    val result = imageCropper.crop(
+                        uri,
+                        context
+                    ) // Suspends until user accepts or cancels cropping
+                    when (result) {
+                        CropResult.Cancelled -> {}
+                        is CropError -> {}
+                        is CropResult.Success -> {
+                            imageBitmap = result.bitmap
+                        }
+                    }
+                }
+            }
         }
 
-    val composableScope = rememberCoroutineScope()
     var loadingEnabled by remember { mutableStateOf(false) }
     Box(
         modifier = Modifier
@@ -208,26 +262,63 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                             Modifier
                                 .wrapContentHeight()
                         ) {
-                            AsyncImage(
-                                model = if (imageUri != null && imageUri != "") imageUri else R.drawable.baseline_photo_camera_24,
-                                contentDescription = null,
-                                contentScale = ContentScale.FillWidth,
-                                colorFilter = if (imageUri != null && imageUri?.isNotEmpty() == true) null
-                                else ColorFilter.tint(
-                                    textColor
-                                ),
-                                modifier = Modifier
-                                    .heightIn(0.dp, 400.dp)
-                                    .wrapContentHeight()
-                                    .fillMaxWidth()
-                                    .clip(
-                                        RoundedCornerShape(
-                                            bottomEnd = 20.dp,
-                                            bottomStart = 20.dp
+
+                            if (imageBitmap != null) {
+                                Image(
+                                    bitmap = imageBitmap!!,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.FillWidth,
+                                    modifier = Modifier
+                                        .heightIn(0.dp, 400.dp)
+                                        .wrapContentHeight()
+                                        .fillMaxWidth()
+                                        .clip(
+                                            RoundedCornerShape(
+                                                bottomEnd = 20.dp,
+                                                bottomStart = 20.dp
+                                            )
                                         )
-                                    )
-                                    .clickable(onClick = { launcher.launch("image/*") })
-                            )
+                                        .clickable(onClick = { launcher.launch("image/*") })
+                                )
+                            } else if (initialImageUri != "" && initialImageUri != null) {
+                                Image(
+                                    painter = rememberAsyncImagePainter(initialImageUri),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.FillWidth,
+                                    modifier = Modifier
+                                        .heightIn(0.dp, 400.dp)
+                                        .wrapContentHeight()
+                                        .fillMaxWidth()
+                                        .clip(
+                                            RoundedCornerShape(
+                                                bottomEnd = 20.dp,
+                                                bottomStart = 20.dp
+                                            )
+                                        )
+                                        .clickable(onClick = { launcher.launch("image/*") }
+                                        )
+                                )
+                            }
+                            else {
+                                Image(
+                                    imageVector = ImageVector.vectorResource(R.drawable.baseline_photo_camera_24),
+                                    contentDescription = null,
+                                    colorFilter = ColorFilter.tint(textColor),
+                                    contentScale = ContentScale.FillWidth,
+                                    modifier = Modifier
+                                        .heightIn(0.dp, 400.dp)
+                                        .wrapContentHeight()
+                                        .fillMaxWidth()
+                                        .clip(
+                                            RoundedCornerShape(
+                                                bottomEnd = 20.dp,
+                                                bottomStart = 20.dp
+                                            )
+                                        )
+                                        .clickable(onClick = { launcher.launch("image/*") }
+                                        )
+                                )
+                            }
                             IconButton(
                                 modifier = Modifier
                                     .align(Alignment.TopEnd)
@@ -255,7 +346,7 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                 ) {
                                     item {
                                         Text(
-                                            category,
+                                            category!!,
                                             fontWeight = FontWeight.Medium,
                                             color = textColor,
                                             modifier = Modifier
@@ -276,7 +367,7 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                             exit = fadeOut() + scaleOut()
                                         ) {
                                             Text(
-                                                it,
+                                                it!!,
                                                 fontWeight = FontWeight.Medium,
                                                 color = textColor,
                                                 modifier = Modifier
@@ -294,7 +385,7 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                     }
                                 }
                                 TextField(
-                                    value = title,
+                                    value = title!!,
                                     onValueChange = { title = it },
                                     maxLines = 1,
                                     modifier = Modifier
@@ -330,29 +421,97 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                 )
                             }
                         }
-                        TextField(
-                            value = description,
-                            onValueChange = { description = it },
-                            modifier = Modifier
-                                .background(textFieldColor)
-                                .padding(10.dp)
-                                .fillMaxWidth()
-                                .wrapContentHeight()
-                                .clip(RoundedCornerShape(20.dp)),
-                            colors = TextFieldDefaults.colors(
-                                unfocusedTextColor = textColor,
-                                focusedTextColor = textColor,
-                                focusedContainerColor = white,
-                                unfocusedContainerColor = white,
-                                unfocusedLabelColor = DarkGray,
-                                focusedLabelColor = DarkGray
-                            ),
-                            textStyle = TextStyle(fontSize = 16.sp),
-                            label = { Text(stringResource(R.string.description)) }
-                        )
+                        Box {
+                            TextField(
+                                value = credits!!,
+                                onValueChange = { credits = it },
+                                modifier = Modifier
+                                    .background(textFieldColor)
+                                    .padding(10.dp)
+                                    .fillMaxWidth()
+                                    .wrapContentHeight()
+                                    .clip(RoundedCornerShape(20.dp)),
+                                colors = TextFieldDefaults.colors(
+                                    unfocusedTextColor = textColor,
+                                    focusedTextColor = textColor,
+                                    focusedContainerColor = textFieldColor,
+                                    unfocusedContainerColor = textFieldColor,
+                                    unfocusedLabelColor = DarkGray,
+                                    focusedLabelColor = DarkGray
+                                ),
+                                textStyle = TextStyle(fontSize = 14.sp),
+                                label = { Text(stringResource(R.string.credits)) },
+                                trailingIcon = {
+                                    Row {
+
+                                        IconButton(
+                                            onClick = {
+                                                creditsInfoExpanded = !creditsInfoExpanded
+                                            },
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Info,
+                                                contentDescription = "Error",
+                                                tint = Gray
+                                            )
+                                        }
+
+                                    }
+                                }
+                            )
+                            Row(Modifier.align(Alignment.TopEnd)) {
+                                AnimatedVisibility(
+                                    visible = creditsInfoExpanded,
+                                    enter = fadeIn() + scaleIn(),
+                                    exit = fadeOut() + scaleOut(),
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(vertical = 10.dp)
+                                            .padding(end = 50.dp)
+                                            .background(
+                                                white,
+                                                RoundedCornerShape(
+                                                    20.dp
+                                                )
+                                            )
+                                            .wrapContentWidth()
+                                            .padding(12.dp)
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.leaveCredits),
+                                            color = textColor
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
 
                     }
 
+                }
+                item {
+                    TextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        modifier = Modifier
+                            .background(textFieldColor)
+                            .padding(10.dp)
+                            .fillMaxWidth()
+                            .wrapContentHeight()
+                            .clip(RoundedCornerShape(20.dp)),
+                        colors = TextFieldDefaults.colors(
+                            unfocusedTextColor = textColor,
+                            focusedTextColor = textColor,
+                            focusedContainerColor = white,
+                            unfocusedContainerColor = white,
+                            unfocusedLabelColor = DarkGray,
+                            focusedLabelColor = DarkGray
+                        ),
+                        textStyle = TextStyle(fontSize = 16.sp),
+                        label = { Text(stringResource(R.string.description)) }
+                    )
                 }
                 item {
                     AnimatedVisibility(
@@ -523,7 +682,8 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                             }
                                             IconButton(
                                                 onClick = {
-                                                    expandedRows[indexD] = !expandedRows[indexD]
+                                                    expandedRows[indexD] =
+                                                        !expandedRows[indexD]
                                                 },
                                             ) {
                                                 Icon(
@@ -553,8 +713,13 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                     ) {
                                         var repeat by remember { mutableStateOf(index + 2) }
                                         var expanded by remember { mutableStateOf(false) }
-                                        var openRepeat by remember { mutableStateOf(false) }
-                                        var images = remember { mutableStateListOf<String?>() }
+                                        var openRepeat by remember {
+                                            mutableStateOf(
+                                                false
+                                            )
+                                        }
+                                        var images =
+                                            remember { mutableStateListOf<String?>() }
                                         row.note?.let {
                                             it.imageUrl.forEach {
                                                 if (!images.contains(it)) images.add(it)
@@ -579,11 +744,12 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                         var stateBox = rememberSwipeToDismissBoxState(
                                             confirmValueChange = { it ->
                                                 if (it == SwipeToDismissBoxValue.EndToStart) {
-                                                    details[indexD] = details[indexD].copy(
-                                                        rows = details[indexD].rows.toMutableList()
-                                                            .apply {
-                                                                removeAt(index)
-                                                            })
+                                                    details[indexD] =
+                                                        details[indexD].copy(
+                                                            rows = details[indexD].rows.toMutableList()
+                                                                .apply {
+                                                                    removeAt(index)
+                                                                })
                                                 }
 
                                                 it != SwipeToDismissBoxValue.EndToStart
@@ -622,7 +788,11 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                         ) {
 
                                             Box() {
-                                                Column(modifier = Modifier.background(textFieldColor)) {
+                                                Column(
+                                                    modifier = Modifier.background(
+                                                        textFieldColor
+                                                    )
+                                                ) {
                                                     TextField(
                                                         value = row.description!!,
                                                         onValueChange = {
@@ -689,7 +859,8 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
 
                                                                 IconButton(
                                                                     onClick = {
-                                                                        expanded = !expanded
+                                                                        expanded =
+                                                                            !expanded
                                                                         keyboard?.hide()
                                                                     },
                                                                 ) {
@@ -762,7 +933,10 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                                             LazyRow(
                                                                 modifier = Modifier
                                                                     .fillMaxWidth()
-                                                                    .heightIn(0.dp, 200.dp)
+                                                                    .heightIn(
+                                                                        0.dp,
+                                                                        200.dp
+                                                                    )
                                                             ) {
                                                                 itemsIndexed(row.note!!.imageUrl) { indexI, uri ->
                                                                     AsyncImage(
@@ -775,7 +949,9 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                                                                     20.dp
                                                                                 )
                                                                             )
-                                                                            .animateEnterExit(exit = fadeOut() + scaleOut())
+                                                                            .animateEnterExit(
+                                                                                exit = fadeOut() + scaleOut()
+                                                                            )
                                                                             .combinedClickable(
                                                                                 onClick = {},
                                                                                 onLongClick = {
@@ -810,7 +986,9 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                                                                 )
                                                                             )
                                                                             .clickable {
-                                                                                launcher.launch("image/*")
+                                                                                launcher.launch(
+                                                                                    "image/*"
+                                                                                )
                                                                             },
                                                                         colorFilter = ColorFilter.tint(
                                                                             textColor
@@ -838,7 +1016,9 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                                                 .padding(end = 50.dp)
                                                                 .background(
                                                                     white,
-                                                                    RoundedCornerShape(20.dp)
+                                                                    RoundedCornerShape(
+                                                                        20.dp
+                                                                    )
                                                                 )
                                                                 .wrapContentWidth()
                                                                 .padding(12.dp)
@@ -852,7 +1032,8 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                                                     modifier = Modifier
                                                                         .fillMaxSize()
                                                                         .clickable {
-                                                                            expanded = false
+                                                                            expanded =
+                                                                                false
                                                                             details[indexD] =
                                                                                 details[indexD].copy(
                                                                                     rows = details[indexD].rows.toMutableList()
@@ -878,8 +1059,12 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                                                     Text(
                                                                         modifier = Modifier
                                                                             .wrapContentWidth()
-                                                                            .align(Alignment.CenterVertically)
-                                                                            .padding(start = 10.dp),
+                                                                            .align(
+                                                                                Alignment.CenterVertically
+                                                                            )
+                                                                            .padding(
+                                                                                start = 10.dp
+                                                                            ),
                                                                         text = stringResource(
                                                                             if (row.noteAdded) R.string.removeNote
                                                                             else R.string.addNote
@@ -895,8 +1080,10 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                                                         .fillMaxSize()
                                                                         .padding(top = 12.dp)
                                                                         .clickable {
-                                                                            expanded = false
-                                                                            openRepeat = true
+                                                                            expanded =
+                                                                                false
+                                                                            openRepeat =
+                                                                                true
 
                                                                         },
                                                                     verticalAlignment = Alignment.CenterVertically
@@ -912,9 +1099,15 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                                                     Text(
                                                                         modifier = Modifier
                                                                             .wrapContentWidth()
-                                                                            .align(Alignment.CenterVertically)
-                                                                            .padding(start = 10.dp),
-                                                                        text = stringResource(R.string.repeatUnitl),
+                                                                            .align(
+                                                                                Alignment.CenterVertically
+                                                                            )
+                                                                            .padding(
+                                                                                start = 10.dp
+                                                                            ),
+                                                                        text = stringResource(
+                                                                            R.string.repeatUnitl
+                                                                        ),
                                                                         style = MaterialTheme.typography.bodyLarge,
                                                                         fontWeight = FontWeight.Bold,
                                                                         color = textColor
@@ -927,7 +1120,9 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                                 }
                                                 if (openRepeat) {
                                                     BasicAlertDialog(
-                                                        onDismissRequest = { openRepeat = false }
+                                                        onDismissRequest = {
+                                                            openRepeat = false
+                                                        }
                                                     ) {
                                                         Surface(
                                                             modifier = Modifier
@@ -935,7 +1130,11 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                                                 .wrapContentHeight(),
                                                             shape = MaterialTheme.shapes.large
                                                         ) {
-                                                            Column(modifier = Modifier.padding(16.dp)) {
+                                                            Column(
+                                                                modifier = Modifier.padding(
+                                                                    16.dp
+                                                                )
+                                                            ) {
                                                                 OutlinedTextField(
                                                                     value = repeat.toString(),
                                                                     onValueChange = {
@@ -953,12 +1152,16 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                                                     isError = (repeat < index + 2),
                                                                     label = {
                                                                         if (repeat < index + 2) Text(
-                                                                            stringResource(R.string.repeatUnitl) + "* " + stringResource(
+                                                                            stringResource(
+                                                                                R.string.repeatUnitl
+                                                                            ) + "* " + stringResource(
                                                                                 R.string.repeatMustBe
                                                                             )
                                                                         )
                                                                         else Text(
-                                                                            stringResource(R.string.repeatUnitl)
+                                                                            stringResource(
+                                                                                R.string.repeatUnitl
+                                                                            )
                                                                         )
                                                                     },
                                                                     textStyle = LocalTextStyle.current.copy(
@@ -1002,13 +1205,16 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
 
                                                                 Button(
                                                                     modifier = Modifier
-                                                                        .clip(CircleShape)
+                                                                        .clip(
+                                                                            CircleShape
+                                                                        )
                                                                         .fillMaxWidth(),
                                                                     colors = ButtonDefaults.buttonColors(
                                                                         accent_secondary
                                                                     ),
                                                                     onClick = {
-                                                                        openRepeat = false
+                                                                        openRepeat =
+                                                                            false
                                                                         if (repeat > index) {
                                                                             for (i in index + 1..repeat - 1) {
                                                                                 details[indexD] =
@@ -1024,7 +1230,11 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                                                         }
                                                                     }
                                                                 ) {
-                                                                    Text(stringResource(R.string.confirm))
+                                                                    Text(
+                                                                        stringResource(
+                                                                            R.string.confirm
+                                                                        )
+                                                                    )
 
                                                                 }
                                                             }
@@ -1050,19 +1260,25 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                             .padding(4.dp)
                                             .clip(CircleShape)
                                             .fillMaxWidth(),
-                                        colors = ButtonDefaults.buttonColors(accent_secondary),
+                                        colors = ButtonDefaults.buttonColors(
+                                            accent_secondary
+                                        ),
                                         onClick = {
                                             details[indexD] = details[indexD].copy(
-                                                rows = details[indexD].rows.toMutableList().apply {
-                                                    add(
-                                                        RowCrochet(
-                                                            "",
-                                                            Note("", mutableListOf()),
-                                                            false,
-                                                            0
+                                                rows = details[indexD].rows.toMutableList()
+                                                    .apply {
+                                                        add(
+                                                            RowCrochet(
+                                                                "",
+                                                                Note(
+                                                                    "",
+                                                                    mutableListOf()
+                                                                ),
+                                                                false,
+                                                                0
+                                                            )
                                                         )
-                                                    )
-                                                })
+                                                    })
                                         }
                                     ) {
                                         Text(stringResource(R.string.addRow))
@@ -1080,7 +1296,9 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                             modifier = Modifier
                                                 .clip(CircleShape)
                                                 .fillMaxWidth(),
-                                            colors = ButtonDefaults.buttonColors(accent_secondary),
+                                            colors = ButtonDefaults.buttonColors(
+                                                accent_secondary
+                                            ),
                                             onClick = {
                                                 details.add(
                                                     Detail(
@@ -1088,7 +1306,10 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                                         mutableListOf(
                                                             RowCrochet(
                                                                 "",
-                                                                Note("", mutableListOf("")),
+                                                                Note(
+                                                                    "",
+                                                                    mutableListOf("")
+                                                                ),
                                                                 false,
                                                                 0
                                                             )
@@ -1117,7 +1338,8 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                             val launcher =
                                 rememberLauncherForActivityResult(contract = ActivityResultContracts.GetContent()) { uri ->
                                     uri?.let { blogImages.add(it.toString()) }
-                                    blog = blog.copy(additionalImages = blogImages.toMutableList())
+                                    blog =
+                                        blog.copy(additionalImages = blogImages.toMutableList())
                                 }
                             LazyRow(
                                 modifier = Modifier
@@ -1195,14 +1417,10 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
             val formatted = now.format(formatter)
             when (category) {
                 Crocheting -> {
-                    var file: File? = null
-                    if (imageUri?.contains("cxyqsghvgdqyxrjnvrxn.supabase.co") == false) {
-                        file = imageUri?.let {
-                            getFileFromUri(context, Uri.parse(it))
-                        }
-                    }
+
                     composableScope.launch {
                         val project = Project(
+                            credits = credits,
                             category = category,
                             projectData = ProjectData(
                                 likes = if (currentProject != null) currentProject.projectData!!.likes
@@ -1217,14 +1435,14 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                 description = description,
                                 author = userData.value.username!!,
                                 authorID = userData.value.userId,
-                                cover = if (file != null) getData(
+                                cover = if (imageBitmap != null) getData(
                                     "projects",
                                     uploadFile(
                                         "projects",
                                         userData.value.username!!,
-                                        file.readBytes()
+                                        imageBitmapToByteArray(imageBitmap!!)
                                     ).toString()
-                                ) else imageUri
+                                ) else initialImageUri
                             ),
                             tool = "${tool}mm",
                             yarns = yarns,
@@ -1280,64 +1498,60 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                 }
 
                 Category.Blog -> {
-                    var file: File? = null
-                    if (imageUri?.contains("cxyqsghvgdqyxrjnvrxn.supabase.co") == false) {
-                        file = imageUri?.let {
-                            getFileFromUri(context, Uri.parse(it))
-                        }
-                    }
                     composableScope.launch {
                         var newImagesList = mutableListOf<String?>()
 
                         val blog = Blog(
+                            credits = credits,
                             category = category,
                             projectData = ProjectData(
-                                likes = if (currentProject != null) currentProject.projectData!!.likes
+                                likes = if (blog_ != null) blog_.projectData!!.likes
                                 else Likes(),
-                                reviews = if (currentProject != null) currentProject.projectData!!.reviews
+                                reviews = if (blog_ != null) blog_.projectData!!.reviews
                                 else 0,
-                                projectId = if (currentProject != null) currentProject.projectData!!.projectId
+                                projectId = if (blog_ != null) blog_.projectData!!.projectId
                                 else uniqueUUID,
                                 title = title,
-                                date = if (currentProject != null) currentProject.projectData!!.date
+                                date = if (blog_ != null) blog_.projectData!!.date
                                 else formatted,
                                 description = description,
                                 author = userData.value.username!!,
                                 authorID = userData.value.userId,
-                                cover = if (file != null) getData(
+                                cover = if (imageBitmap != null) getData(
                                     "blogs",
                                     uploadFile(
                                         "blogs",
                                         userData.value.username!!,
-                                        file.readBytes()
+                                        imageBitmapToByteArray(imageBitmap!!)
                                     ).toString()
-                                ) else imageUri
+                                ) else initialImageUri
                             ),
                             additionalImages = newImagesList.apply {
                                 blogImages.forEach { string ->
                                     var file: File? = null
-                                    string?.contains("cxyqsghvgdqyxrjnvrxn.supabase.co")?.let {
-                                        if (!it) {
-                                            file =
-                                                getFileFromUri(
-                                                    context,
-                                                    Uri.parse(string)
-                                                )
-                                            file?.let {
-                                                newImagesList.add(
-                                                    getData(
-                                                        "projects",
-                                                        uploadFile(
-                                                            "projects",
-                                                            userData.value.username!!,
-                                                            it.readBytes()
-                                                        ).toString()
+                                    string?.contains("cxyqsghvgdqyxrjnvrxn.supabase.co")
+                                        ?.let {
+                                            if (!it) {
+                                                file =
+                                                    getFileFromUri(
+                                                        context,
+                                                        Uri.parse(string)
                                                     )
-                                                )
-                                            }
-                                            blog.additionalImages = blogImages
-                                        } else newImagesList.add(string)
-                                    }
+                                                file?.let {
+                                                    newImagesList.add(
+                                                        getData(
+                                                            "projects",
+                                                            uploadFile(
+                                                                "projects",
+                                                                userData.value.username!!,
+                                                                it.readBytes()
+                                                            ).toString()
+                                                        )
+                                                    )
+                                                }
+                                                blog.additionalImages = blogImages
+                                            } else newImagesList.add(string)
+                                        }
                                 }
                             }
                         )
@@ -1364,24 +1578,21 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
             var file = context.getDir("Covers", Context.MODE_PRIVATE)
             file = File(file, "${RandomStringUtils.randomAlphanumeric(15)}.jpg")
 
-            imageUri?.let {
-                if (!imageUri!!.contains(url) && imageUri != initialImageUri) {
-                    val out = FileOutputStream(file)
-                    val bitmap =
-                        MediaStore.Images.Media.getBitmap(
-                            context.contentResolver,
-                            Uri.parse(it)
-                        );
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
-                    out.flush()
-                    out.close()
-                    Log.i("ImageSaving", file.absolutePath)
+            imageBitmap?.let {
+                val stream = ByteArrayOutputStream()
+                it.asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, stream) // Use PNG or JPEG format
+                val byteArray: ByteArray = stream.toByteArray()
+                FileOutputStream(file).use { outputStream ->
+                    outputStream.write(byteArray)
                 }
+                Log.i("ImageSaving", file.absolutePath)
+
             }
             when (category) {
                 Crocheting -> {
 
                     val project = Project(
+                        credits = credits,
                         category = category,
                         projectData = ProjectData(
                             projectId = if (currentProject != null) currentProject.projectData!!.projectId else uniqueUUID,
@@ -1390,9 +1601,9 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                             description = description,
                             author = userData.value.username!!,
                             authorID = userData.value.userId,
-                            cover = if (imageUri != initialImageUri)
+                            cover = if (imageBitmap != null)
                                 file.absolutePath
-                            else imageUri
+                            else initialImageUri
                         ),
                         tool = "${tool}mm",
                         yarns = yarns,
@@ -1410,13 +1621,18 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                                     )
                                                 file = File(
                                                     file,
-                                                    "${RandomStringUtils.randomAlphanumeric(15)}.jpg"
+                                                    "${
+                                                        RandomStringUtils.randomAlphanumeric(
+                                                            15
+                                                        )
+                                                    }.jpg"
                                                 )
                                                 val out = FileOutputStream(file)
-                                                val bitmap = MediaStore.Images.Media.getBitmap(
-                                                    context.contentResolver,
-                                                    Uri.parse(string)
-                                                );
+                                                val bitmap =
+                                                    MediaStore.Images.Media.getBitmap(
+                                                        context.contentResolver,
+                                                        Uri.parse(string)
+                                                    );
                                                 bitmap.compress(
                                                     Bitmap.CompressFormat.JPEG,
                                                     85,
@@ -1449,7 +1665,9 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
 
                 Category.Blog -> {
                     composableScope.launch {
+                        var newImagesList = mutableListOf<String?>()
                         val blog = Blog(
+                            credits = credits,
                             category = category,
                             projectData = ProjectData(
                                 likes = if (currentProject != null) currentProject.projectData!!.likes
@@ -1464,13 +1682,12 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                 description = description,
                                 author = userData.value.username!!,
                                 authorID = userData.value.userId,
-                                cover = if (imageUri != initialImageUri)
+                                cover = if (imageBitmap != null)
                                     file.absolutePath
-                                else imageUri
+                                else initialImageUri
                             ),
-                            additionalImages = blogImages.apply {
-                                var newImagesList = mutableListOf<String?>()
-                                forEach { imageUri ->
+                            additionalImages = newImagesList.apply {
+                                blogImages.forEach { imageUri ->
                                     if (imageUri != null && imageUri != "null" && imageUri != "") {
                                         var file =
                                             context.getDir("Covers", Context.MODE_PRIVATE)
@@ -1492,9 +1709,9 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                 }
                             })
                         if (blog_ != null) {
-                            FirebaseDB.updateBlog(blog)
-                        } else FirebaseDB.storeBlog(blog, uniqueUUID)
-                        RoomDatabase(context).deleteBlogDraft(blog)
+                            RoomDatabase(context).updateBlogDraft(blog)
+                        } else RoomDatabase(context).addBlogDraft(blog, uniqueUUID)
+                        navController.popBackStack()
                     }
                 }
             }
@@ -1511,8 +1728,19 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
         if (deleteProjectDialog) {
             DeleteAlertDialog(
                 {
-                    FirebaseDB.deleteProject(currentProject?.projectData?.projectId)
-                    RoomDatabase(context).deleteDraft(currentProject)
+                    if (currentProject != null) {
+                        FirebaseDB.deleteProject(
+                            currentProject.projectData?.projectId,
+                            blog.projectData?.authorID
+                        )
+                        RoomDatabase(context).deleteDraft(currentProject)
+                    } else {
+                        FirebaseDB.deleteBlog(
+                            blog.projectData?.projectId,
+                            blog.projectData?.authorID
+                        )
+                        RoomDatabase(context).deleteBlogDraft(blog)
+                    }
                     editableProject = null
                     navController.popBackStack()
                 },
@@ -1528,7 +1756,7 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                 expandable = true,
                 saveProjectEnabled = saveEnabled,
                 onFabClick = {
-                    saveEnabled = if (title.isEmpty() && imageUri == null) {
+                    saveEnabled = if (title!!.isEmpty() || (imageBitmap == null && initialImageUri == "") ){
                         Toast.makeText(
                             context,
                             context.getString(R.string.provide),

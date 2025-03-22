@@ -144,7 +144,11 @@ fun ExpandedProjectCard(project: Project?, author: UserData) {
                                         project.projectData.likes
                                     )
                                 },
-                            colorFilter = ColorFilter.tint(textColor)
+                            colorFilter = if (project.projectData.likes.users?.contains(
+                                    userData.value.userId
+                                ) == true
+                            ) ColorFilter.tint(headers_activeElement)
+                            else ColorFilter.tint(Color.Gray)
                         )
                         Text(
                             text = project.projectData.likes.total.toString(),

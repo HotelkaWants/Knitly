@@ -4,6 +4,7 @@ agp = "8.8.2"
 coilNetworkOkhttp = "3.0.4"
 commonsLang3 = "3.17.0"
 compressorVersion = "3.0.1"
+coreVersion = "0.1.6"
 gotrueKt = "3.1.1"
 
 gsonVersion = "2.9.0"
@@ -35,6 +36,7 @@ androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = 
 coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coilNetworkOkhttp" }
 commons-lang3 = { module = "org.apache.commons:commons-lang3", version.ref = "commonsLang3" }
 compressor = { module = "id.zelory:compressor", version.ref = "compressorVersion" }
+imageCrop = { module = "com.attafitamim.krop:ui", version.ref = "coreVersion" }
 gotrue-kt = { module = "io.github.jan-tennert.supabase:auth-kt", version.ref = "gotrueKt" }
 
 gson = { module = "com.google.code.gson:gson", version.ref = "gsonVersion" }

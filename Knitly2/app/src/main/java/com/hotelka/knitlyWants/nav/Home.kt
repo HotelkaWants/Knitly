@@ -1,6 +1,7 @@
 package com.hotelka.knitlyWants.nav
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -43,37 +44,26 @@ import com.hotelka.knitlyWants.navController
 import com.hotelka.knitlyWants.ui.theme.accent_secondary
 import com.hotelka.knitlyWants.ui.theme.textColor
 import com.hotelka.knitlyWants.ui.theme.white
+import com.hotelka.knitlyWants.userWatching
 import com.hotelka.knitlyWants.users
 
 
 @Composable
 fun HomeScreen() {
     var projects = remember { mutableStateListOf<Project>() }
-    FirebaseDatabase.getInstance().getReference().child(PROJECTS).addValueEventListener(object : ValueEventListener {
-        override fun onDataChange(snapshot: DataSnapshot) {
-            projects.clear()
-            for (childSnapshot in snapshot.children) {
-                val item = childSnapshot.getValue(Project::class.java)
-                projects.add(item!!)
-            }
+    FirebaseDatabase.getInstance().getReference().child(PROJECTS).get().addOnSuccessListener{snapshot ->
+        for (childSnapshot in snapshot.children) {
+            val item = childSnapshot.getValue(Project::class.java)
+            projects.add(item!!)
         }
-
-        override fun onCancelled(error: DatabaseError) {
-        }
-    })
+    }
     var blogs = remember { mutableStateListOf<Blog>() }
-    FirebaseDatabase.getInstance().getReference().child(BLOGS).addValueEventListener(object : ValueEventListener {
-        override fun onDataChange(snapshot: DataSnapshot) {
-            blogs.clear()
-            for (childSnapshot in snapshot.children) {
-                val item = childSnapshot.getValue(Blog::class.java)
-                blogs.add(item!!)
-            }
+    FirebaseDatabase.getInstance().getReference().child(BLOGS).get().addOnSuccessListener{snapshot ->
+        for (childSnapshot in snapshot.children) {
+            val item = childSnapshot.getValue(Blog::class.java)
+            blogs.add(item!!)
         }
-
-        override fun onCancelled(error: DatabaseError) {
-        }
-    })
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -170,7 +160,11 @@ fun UserItem(user: UserData) {
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .padding(10.dp)
-            .background(Color.Transparent),
+            .background(Color.Transparent)
+            .clickable{
+                userWatching = user
+                navController.navigate("userProfile")
+            },
         content = {
             if (user.profilePictureUrl != null) {
                 AsyncImage(

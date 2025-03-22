@@ -23,7 +23,7 @@
     <string name="emailInvalid">Invalid email</string>
     <string name="invalidPassword">Password must be 7 length minimal</string>
     <string name="password_dont_match">Passwords don\'t match</string>
-    <string name="username_valid">Username length mustb ne 7...17 range</string>
+    <string name="username_valid">Username length must be in 7...17 range</string>
     <string name="required">Required</string>
     <string name="my_profile">My Profile</string>
     <string name="save">Save</string>
@@ -86,7 +86,18 @@
     <string name="haveAccount">I have an account!</string>
     <string name="addAccount">Create Linked Account</string>
     <string name="newAccountCredentials"> Please, provide new account credentials✨</string>
-    <string name="noProject">No Projects Yet</string>
+    <string name="noPosts">No Posts Yet</string>
     <string name="news">News</string>
+    <string name="credits">Credits</string>
+    <string name="creditsFor">"Credits: "</string>
+    <string name="leaveComment">Leave a comment</string>
+    <string name="reply">Reply</string>
+    <string name="unsubscribe">Unsubscribe</string>
+    <string name="subscribe">Subscribe</string>
+    <string name="noComments">No Comments Yet</string>
+    <string name="changeProfilePhoto">Change Photo Profile</string>
+    <string name="saveChanges">Save Changes</string>
+    <string name="leaveCredits">Leave links to the source, author or your social media</string>
+    <string name="chat">Chat</string>
 
 </resources>

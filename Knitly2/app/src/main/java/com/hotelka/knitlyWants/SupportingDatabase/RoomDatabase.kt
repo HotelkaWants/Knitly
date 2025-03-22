@@ -18,7 +18,7 @@ class RoomDatabase(context: Context) :
 
     companion object {
         private const val DATABASE_NAME = "KnitlyDB"
-        private const val DATABASE_VERSION = 3
+        private const val DATABASE_VERSION = 4
 
         private const val TABLE_PROJECTS_DRAFT = "Projects_Draft"
         private const val TABLE_PROJECTS = "Projects"
@@ -212,8 +212,8 @@ class RoomDatabase(context: Context) :
 
         if (cursor.moveToFirst()) {
             do {
-                val projectData = Gson().fromJson(cursor.getString(1), ProjectData::class.java)
-                val additionalImages =  Gson().fromJson(cursor.getString(2), Array<String?>::class.java).toMutableList()
+                val projectData = Gson().fromJson(cursor.getString(2), ProjectData::class.java)
+                val additionalImages =  Gson().fromJson(cursor.getString(1), Array<String?>::class.java).toMutableList()
                 val category = cursor.getString(3)
                 blogs.add(Blog(additionalImages = additionalImages, projectData = projectData, category = category))
             } while (cursor.moveToNext())

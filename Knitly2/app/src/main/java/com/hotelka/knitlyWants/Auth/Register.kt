@@ -3,7 +3,6 @@ package com.hotelka.knitlyWants.Auth
 import android.content.ContentValues.TAG
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -19,11 +18,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -36,26 +37,34 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -76,6 +85,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import coil3.compose.AsyncImage
+import com.attafitamim.krop.core.crop.CropError
+import com.attafitamim.krop.core.crop.CropResult
+import com.attafitamim.krop.core.crop.crop
+import com.attafitamim.krop.core.crop.rememberImageCropper
+import com.attafitamim.krop.ui.ImageCropperDialog
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -89,9 +103,9 @@ import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB
 import com.hotelka.knitlyWants.MainActivity
 import com.hotelka.knitlyWants.R
 import com.hotelka.knitlyWants.Supbase.getData
-import com.hotelka.knitlyWants.Supbase.getFileFromUri
 import com.hotelka.knitlyWants.Supbase.signInWithFirebase
 import com.hotelka.knitlyWants.Supbase.uploadFile
+import com.hotelka.knitlyWants.imageBitmapToByteArray
 import com.hotelka.knitlyWants.ui.theme.KnitlyTheme
 import com.hotelka.knitlyWants.ui.theme.accent_secondary
 import com.hotelka.knitlyWants.ui.theme.basic
@@ -100,6 +114,8 @@ import com.hotelka.knitlyWants.ui.theme.headers_activeElement
 import com.hotelka.knitlyWants.ui.theme.secondary
 import com.hotelka.knitlyWants.ui.theme.textColor
 import com.hotelka.knitlyWants.ui.theme.textFieldColor
+import com.hotelka.knitlyWants.ui.theme.white
+import com.hotelka.knitlyWants.urlToBitmap
 import com.hotelka.knitlyWants.userData
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -142,7 +158,7 @@ class RegisterActivity : ComponentActivity() {
         NavHost(
             navController = navController,
 
-            startDestination = if (!extra)"register" else "infoScreen",
+            startDestination = if (!extra) "register" else "infoScreen",
 
             builder = {
                 composable("infoScreen") {
@@ -183,11 +199,19 @@ class RegisterActivity : ComponentActivity() {
         auth.signInWithCredential(credential)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
-                    FirebaseDB.checkExistUser(task.result.user?.uid.toString(), onExist = {UpdateUI(task.result.user!!, this)}){
-                        runBlocking { signInWithFirebase() }
-                        FirebaseDB.createUser(task.result.user!!)
-                        navController.navigate("infoScreen")
-                    }
+                    FirebaseDB.checkExistUser(task.result.user?.uid.toString(),
+                        rememberId = { id ->
+                            var prefs = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
+                            val editor = prefs.edit()
+                            editor.putString("idSelected", id)
+                            editor.apply()
+                        },
+                        onExist = { UpdateUI(task.result.user!!, this) },
+                        onNotExist = {
+                            runBlocking { signInWithFirebase() }
+                            FirebaseDB.createUser(task.result.user!!)
+                            navController.navigate("infoScreen")
+                        })
 
                 } else {
                     Log.w(TAG, "signInWithCredential:failure", task.exception)
@@ -222,8 +246,8 @@ fun SignInScreen(
     activity: RegisterActivity
 ) {
     var passwordReset by rememberSaveable { mutableStateOf(false) }
-    if (passwordReset){
-        PasswordResetAlert({ passwordReset = false }){ email ->
+    if (passwordReset) {
+        PasswordResetAlert({ passwordReset = false }) { email ->
             FirebaseAuthenticationHelper.sendPasswordReset(email) {
                 Toast.makeText(
                     activity,
@@ -431,7 +455,8 @@ fun SignInScreen(
                 .padding(10.dp)
                 .clickable {
                     passwordReset = true
-                },
+                }
+                .imePadding(),
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
             color = textColor
@@ -441,9 +466,9 @@ fun SignInScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PasswordResetAlert(onDismiss: () -> Unit, onSendClicked:(String) -> Unit) {
+fun PasswordResetAlert(onDismiss: () -> Unit, onSendClicked: (String) -> Unit) {
     BasicAlertDialog(
-        onDismissRequest = {onDismiss() }
+        onDismissRequest = { onDismiss() }
     ) {
         Surface(
             modifier = Modifier
@@ -512,7 +537,12 @@ fun PasswordResetAlert(onDismiss: () -> Unit, onSendClicked:(String) -> Unit) {
                         }
                     )
                 )
-                Row(Modifier.wrapContentSize().padding(top = 5.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                Row(
+                    Modifier
+                        .wrapContentSize()
+                        .padding(top = 5.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
 
                     Button(
                         modifier = Modifier
@@ -532,8 +562,9 @@ fun PasswordResetAlert(onDismiss: () -> Unit, onSendClicked:(String) -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun provideInformationScreen(register: ComponentActivity, linking:Boolean = false) {
+fun provideInformationScreen(register: ComponentActivity, linking: Boolean = false) {
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val composableScope = rememberCoroutineScope()
@@ -545,21 +576,70 @@ fun provideInformationScreen(register: ComponentActivity, linking:Boolean = fals
 
     var username = remember { mutableStateOf("") }
     var bio = remember { mutableStateOf("") }
-    var photoURL by remember { mutableStateOf("") }
     var name = remember { mutableStateOf("") }
     var lastName = remember { mutableStateOf("") }
 
-    var imageUri by remember { mutableStateOf<Uri?>(null) }
     val context = LocalContext.current
+    var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
+    if (auth.photoUrl != null) {
+        urlToBitmap(composableScope,
+            auth.photoUrl.toString(),
+            context,
+            onError = { Log.e("Error", it.message.toString()) }) { bitmap ->
+            imageBitmap = bitmap.asImageBitmap()
+        }
+    }
+    val imageCropper = rememberImageCropper()
+    val cropState = imageCropper.cropState
+    if (cropState != null) ImageCropperDialog(
+        state = cropState,
+        dialogPadding = PaddingValues(top = 0.dp, start = 0.dp, end = 0.dp, bottom = 80.dp),
+        topBar = {
+            TopAppBar(
+                title = {},
+                navigationIcon = {
+                    IconButton(onClick = { cropState.done(accept = false) }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = white)
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { cropState.reset() }) {
+                        Icon(painterResource(R.drawable.restore), null, tint = white)
+                    }
+                    IconButton(
+                        onClick = { cropState.done(accept = true) },
+                        enabled = !cropState.accepted
+                    ) {
+                        Icon(Icons.Default.Done, null, tint = white)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = textColor)
+            )
+        }
+    )
     val launcher =
         rememberLauncherForActivityResult(contract = ActivityResultContracts.GetContent()) { uri ->
-            imageUri = uri
+            if (uri != null) {
+                composableScope.launch {
+                    val result = imageCropper.crop(
+                        uri,
+                        context
+                    ) // Suspends until user accepts or cancels cropping
+                    when (result) {
+                        CropResult.Cancelled -> {}
+                        is CropError -> {}
+                        is CropResult.Success -> {
+                            imageBitmap = result.bitmap
+                        }
+                    }
+                }
+            }
         }
 
     fun usernameNotAvailable(usernameWanted: String): Boolean {
         isUserExist = false
-        FirebaseDB.refUsers.get().addOnSuccessListener{
+        FirebaseDB.refUsers.get().addOnSuccessListener {
             it.children.forEach { user ->
                 val username = user.getValue<UserData>(UserData::class.java)?.username.toString()
                 if (usernameWanted.replace(" ", "").contains(username)) isUserExist = true
@@ -601,7 +681,7 @@ fun provideInformationScreen(register: ComponentActivity, linking:Boolean = fals
             )
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (imageUri == null) {
+            if (imageBitmap == null) {
                 AsyncImage(
                     model = R.drawable.outline_account_circle_24,
                     contentDescription = "Profile Picture",
@@ -620,8 +700,8 @@ fun provideInformationScreen(register: ComponentActivity, linking:Boolean = fals
 
                     )
             } else {
-                AsyncImage(
-                    model = imageUri,
+                Image(
+                    bitmap = imageBitmap!!,
                     contentDescription = "Profile Picture",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
@@ -758,27 +838,16 @@ fun provideInformationScreen(register: ComponentActivity, linking:Boolean = fals
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = secondary,
                     unfocusedContainerColor = textFieldColor
-                ),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(
-                    onDone = {
-                        keyboard?.hide()
-                    }
                 )
             )
             Spacer(modifier = Modifier.height(24.dp))
             Button(
                 onClick = {
-                    val file = imageUri?.let {
-                        getFileFromUri(context, it)
-                    }
-                    composableScope.launch {
-                        file?.let {
+                    if ((isUserExist == false) && (usernameError.value == false) && (nameError.value == false)) {
+
+                        composableScope.launch {
+
                             val id = if (!linking) auth.uid else UUID.randomUUID().toString()
-                            photoURL = getData(
-                                "avatars",
-                                uploadFile("avatars", id, file.readBytes()).toString()
-                            )
 
 
                             val parsedUser = UserData(
@@ -787,28 +856,41 @@ fun provideInformationScreen(register: ComponentActivity, linking:Boolean = fals
                                 name = name.value,
                                 lastName = lastName.value,
                                 email = auth.email.toString(),
-                                profilePictureUrl = photoURL,
+                                profilePictureUrl = getData(
+                                    "avatars",
+                                    uploadFile("avatars", id, imageBitmapToByteArray(imageBitmap!!)).toString()
+                                ),
                                 bio = bio.value,
                                 linkedAccountsId = userData.value.userId
                             )
-                            var prefs = register.getSharedPreferences("Prefs", Context.MODE_PRIVATE)
+                            var prefs =
+                                register.getSharedPreferences("Prefs", Context.MODE_PRIVATE)
                             val editor = prefs.edit()
                             editor.putString("idSelected", id)
                             editor.apply()
 
                             FirebaseDB.uploadUserInfoReg(parsedUser, {
-                                if (linking){
-                                    FirebaseDB.refUsers.child(userData.value.userId).child("linkedAccountsId").setValue(id)
+                                if (linking) {
+                                    FirebaseDB.refUsers.child(userData.value.userId)
+                                        .child("linkedAccountsId").setValue(id)
                                 }
-                                register.startActivity(Intent(register, MainActivity::class.java))
+                                register.startActivity(
+                                    Intent(
+                                        register,
+                                        MainActivity::class.java
+                                    )
+                                )
                                 register.finish()
                             })
 
                         }
+
                     }
 
                 },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .imePadding(),
                 colors = ButtonDefaults.buttonColors(containerColor = accent_secondary)
             ) {
                 Text(stringResource(R.string.create_profile))
@@ -1061,7 +1143,8 @@ fun RegisterScreen(
             modifier = Modifier
                 .align(Alignment.End)
                 .padding(10.dp)
-                .clickable { navController.navigate("signIn") },
+                .clickable { navController.navigate("signIn") }
+                .imePadding(),
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
             color = textColor
@@ -1071,7 +1154,6 @@ fun RegisterScreen(
 
 fun UpdateUI(user: FirebaseUser?, startActivity: ComponentActivity) {
     if (user != null) {
-        FirebaseDB.createUser(FirebaseAuth.getInstance().currentUser!!)
         startActivity.startActivity(Intent(startActivity, MainActivity::class.java))
         startActivity.finish()
     } else {

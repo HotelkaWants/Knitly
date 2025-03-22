@@ -99,7 +99,9 @@ import com.hotelka.knitlyWants.nav.DashBoard
 import com.hotelka.knitlyWants.nav.HomeScreen
 import com.hotelka.knitlyWants.nav.ProjectOverview
 import com.hotelka.knitlyWants.nav.Tutorials
-import com.hotelka.knitlyWants.nav.UserProfileScreen
+import com.hotelka.knitlyWants.nav.CurrentUserProfileScreen
+import com.hotelka.knitlyWants.nav.EditProfile
+import com.hotelka.knitlyWants.nav.UserProfile
 import com.hotelka.knitlyWants.nav.WorkingOnProject
 import com.hotelka.knitlyWants.ui.theme.KnitlyTheme
 import com.hotelka.knitlyWants.ui.theme.accent_secondary
@@ -122,6 +124,7 @@ lateinit var userData: MutableState<UserData>
 var projectCurrent: Project? = null
 var editableProject: Project? = null
 var editableBlog: Blog? = null
+var userWatching: UserData? = null
 var blogCurrent: Blog? = null
 var currentProjectInProgress: ProjectsArchive? = null
 lateinit var users: MutableState<List<UserData>>
@@ -171,7 +174,6 @@ class MainActivity : ComponentActivity() {
             .addValueEventListener(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     userData.value = snapshot.getValue<UserData>(UserData::class.java)!!
-
                 }
 
                 override fun onCancelled(error: DatabaseError) {
@@ -209,9 +211,10 @@ class MainActivity : ComponentActivity() {
                 }
 
                 composable("myProfile") {
-                    UserProfileScreen(
-                        logOut = ::HandleLogOut
-                    )
+                    CurrentUserProfileScreen()
+                }
+                composable("editProfile") {
+                    EditProfile()
                 }
                 composable("home") {
                     HomeScreen()
@@ -221,6 +224,11 @@ class MainActivity : ComponentActivity() {
                 }
                 composable("tutorials") {
                     Tutorials()
+                }
+                composable("userProfile") {
+                    if (userWatching != null) {
+                        UserProfile(userWatching!!)
+                    }
                 }
                 composable("projectOverview") {
                     if (projectCurrent != null) {

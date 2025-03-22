@@ -41,6 +41,7 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.ValueEventListener
 import com.hotelka.knitlyWants.Cards.DraftCard
 import com.hotelka.knitlyWants.Cards.ProjectProgressCard
+import com.hotelka.knitlyWants.Data.Blog
 import com.hotelka.knitlyWants.Data.Project
 import com.hotelka.knitlyWants.Data.ProjectsArchive
 import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB
@@ -54,6 +55,8 @@ import com.hotelka.knitlyWants.ui.theme.headers_activeElement
 import com.hotelka.knitlyWants.ui.theme.textColor
 import com.hotelka.knitlyWants.ui.theme.white
 import com.hotelka.knitlyWants.userData
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @OptIn(
@@ -63,8 +66,22 @@ import com.hotelka.knitlyWants.userData
 @Preview
 @Composable
 fun DashBoard() {
-    val usersDrafts = remember { mutableStateListOf<Project>() }
+    val dateTimeStrToLocalDateTime: (String) -> LocalDateTime = {
+        LocalDateTime.parse(it, DateTimeFormatter.ofPattern("HH:mm, dd.MM.yyyy"))
+    }
+
+    var usersDrafts = remember { mutableStateListOf<Any>() }
     usersDrafts.addAll(RoomDatabase(LocalContext.current).getAllProjectsDraft())
+    usersDrafts.addAll(RoomDatabase(LocalContext.current).getAllBlogDrafts())
+    var sortedDrafts = remember { mutableStateOf(
+        usersDrafts.sortedWith(compareBy {
+            when(it){
+                is Blog -> it.projectData?.date
+                is Project -> it.projectData?.date
+                else -> throw IllegalArgumentException("")
+            }
+        }).toMutableList()
+    ) }
     val projectsInProgress = remember { mutableStateListOf<ProjectsArchive>() }
 
     var projectsInProgressCount by remember { mutableIntStateOf(0) }
@@ -103,7 +120,7 @@ fun DashBoard() {
             LazyColumn(
                 modifier = Modifier
                     .background(Transparent)
-                    .padding(top = paddingFromSearch + 25.dp)
+                    .padding(top = paddingFromSearch)
                     .padding(),
                 scrollState
             ) {
@@ -114,7 +131,6 @@ fun DashBoard() {
                         Text(
                             fontSize = 25.sp,
                             modifier = Modifier
-                                .padding(top = 25.dp)
                                 .background(basic)
                                 .fillMaxWidth()
                                 .padding(horizontal = 10.dp)
@@ -141,7 +157,10 @@ fun DashBoard() {
                             horizontalArrangement = Arrangement.SpaceEvenly
                         ) {
                             itemsIndexed(usersDrafts) { index, draft ->
-                                DraftCard(draft)
+                                when(draft){
+                                    is Blog -> DraftCard(null, draft)
+                                    is Project -> DraftCard(draft, null)
+                                }
                             }
                         }
 

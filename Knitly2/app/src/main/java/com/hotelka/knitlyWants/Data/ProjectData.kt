@@ -16,6 +16,8 @@ data class Blog(
     var projectData: ProjectData? = ProjectData(),
     var additionalImages: MutableList<String?> = mutableListOf(),
     val category: String? = Category.Blog,
+    val credits: String?="",
+    var comments: MutableMap<String, Comment>? = LinkedHashMap(),
 
     )
 
@@ -42,6 +44,13 @@ data class ProjectData(
     val cover: String? = ""
 ) {}
 
+data class Comment(
+    val id: String? = "",
+    val text: String? = "",
+    val userId: String? = "",
+    val timestamp: String? = "",
+    var likes: Likes = Likes(),
+)
 data class Likes(
     var total: Int? = 0,
     var users: List<String>? = listOf()
@@ -49,9 +58,11 @@ data class Likes(
 
 data class Project(
     val category: String? = "",
+    val credits: String? = "",
     val projectData: ProjectData? = ProjectData(),
     val tool: String? = "0.0",
     val yarns: String? = "",
+    var comments: MutableMap<String, Comment>? = LinkedHashMap(),
     var details: MutableList<Detail>? = mutableListOf(),
 )
 
