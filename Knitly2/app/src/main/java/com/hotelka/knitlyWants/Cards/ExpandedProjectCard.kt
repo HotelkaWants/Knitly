@@ -35,7 +35,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Color.Companion.Transparent
 import androidx.compose.ui.graphics.ColorFilter
@@ -66,8 +65,24 @@ import com.hotelka.knitlyWants.userData
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ExpandedProjectCard(project: Project?, author: UserData) {
+fun ExpandedProjectCard(project: Project, author: UserData) {
     var expanded by remember { mutableStateOf(false) }
+    var likes by remember { mutableStateOf(project.projectData!!.likes) }
+    var likeIcon by remember { mutableStateOf(
+        if (project!!.projectData!!.likes.users?.contains(
+                userData.value.userId
+            ) == true
+        ) Icons.Filled.Favorite
+        else Icons.Outlined.FavoriteBorder
+    ) }
+    var likeCount by remember { mutableStateOf(project.projectData!!.likes.total) }
+    var iconColorFilter by remember { mutableStateOf(
+        if (project.projectData!!.likes.users?.contains(
+                userData.value.userId
+            ) == true
+        ) ColorFilter.tint(headers_activeElement)
+        else ColorFilter.tint(Color.Gray)
+    ) }
     Card(
         modifier = Modifier
             .clickable { expanded = !expanded }
@@ -100,10 +115,10 @@ fun ExpandedProjectCard(project: Project?, author: UserData) {
                     horizontalAlignment = Alignment.Start
                 ) {
                     Text(
-                        text = project?.projectData?.title!!,
+                        text = project.projectData.title!!,
                         modifier = Modifier
                             .width(150.dp),
-                        fontSize = 24.sp,
+                        fontSize = 22.sp,
                         color = textColor
 
                     )
@@ -141,17 +156,24 @@ fun ExpandedProjectCard(project: Project?, author: UserData) {
                                 .clickable {
                                     FirebaseDB.sendLike(
                                         project.projectData.projectId.toString(),
-                                        project.projectData.likes
-                                    )
+                                        likes
+                                    ) { sent, like ->
+                                        likes = like
+                                        if (sent){
+                                            likeCount = likeCount!! + 1
+                                            likeIcon = Icons.Filled.Favorite
+                                            iconColorFilter = ColorFilter.tint(headers_activeElement)
+                                        } else {
+                                            likeCount = likeCount!! - 1
+                                            likeIcon = Icons.Outlined.FavoriteBorder
+                                            iconColorFilter = ColorFilter.tint(Color.Gray)
+                                        }
+                                    }
                                 },
-                            colorFilter = if (project.projectData.likes.users?.contains(
-                                    userData.value.userId
-                                ) == true
-                            ) ColorFilter.tint(headers_activeElement)
-                            else ColorFilter.tint(Color.Gray)
+                            colorFilter = iconColorFilter
                         )
                         Text(
-                            text = project.projectData.likes.total.toString(),
+                            text = likeCount.toString(),
                             fontSize = 12.sp,
                             modifier = Modifier
                                 .align(Alignment.CenterVertically)

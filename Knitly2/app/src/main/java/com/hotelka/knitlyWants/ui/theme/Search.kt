@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
@@ -52,8 +51,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
-import androidx.compose.ui.text.toLowerCase
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.hotelka.knitlyWants.Cards.ProjectContainer
@@ -62,10 +59,8 @@ import com.hotelka.knitlyWants.Data.BestResult
 import com.hotelka.knitlyWants.Data.HistoryData
 import com.hotelka.knitlyWants.Data.Project
 import com.hotelka.knitlyWants.Data.UserData
-import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB.Companion.refProjects
-import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB.Companion.refUsers
 import com.hotelka.knitlyWants.R
-import com.hotelka.knitlyWants.SupportingDatabase.RoomDatabase
+import com.hotelka.knitlyWants.SupportingDatabase.SupportingDatabase
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -73,16 +68,16 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Search(scrollState: LazyListState, setPadding: (Dp) -> Unit) {
-    val roomDatabase = RoomDatabase(LocalContext.current)
+    val supportingDatabase = SupportingDatabase(LocalContext.current)
     var searchHistory = remember { mutableStateListOf<HistoryData>() }
-    searchHistory.addAll(roomDatabase.getHistoryList())
+    searchHistory.addAll(supportingDatabase.getHistoryList())
     var query by remember { mutableStateOf("") }
     var active by remember { mutableStateOf(false) }
     var tabsActive by remember { mutableStateOf(false) }
     var isSearchBarExpanded by remember { mutableStateOf(true) }
 
     var bestResult by remember { mutableStateOf<BestResult?>(null) }
-    var projects = remember { mutableStateListOf<Project>() }
+
 
     LaunchedEffect(scrollState) {
         snapshotFlow { scrollState.firstVisibleItemScrollOffset }
@@ -101,16 +96,16 @@ fun Search(scrollState: LazyListState, setPadding: (Dp) -> Unit) {
         animationSpec = tween(durationMillis = 300)
     )
     setPadding(searchBarHeight)
-    var users = remember { mutableStateListOf<UserData>() }
-    refUsers.get().addOnSuccessListener { snapshot ->
-        users.clear()
-        for (childSnapshot in snapshot.children) {
-            val item = childSnapshot.getValue(UserData::class.java)
-            users.add(item!!)
-        }
+
+    var projects by remember { mutableStateOf(supportingDatabase.getAllProjects()) }
+    var existsList = remember { mutableStateListOf<Boolean>() }
+
+    projects.forEach{ project ->
+        existsList.add(supportingDatabase.getProjectInProgressExist(project.projectData!!.projectId!!))
     }
+    var users by remember { mutableStateOf(supportingDatabase.getAllUsers()) }
     bestResult = BestResult(projects = projects, users = users)
-    var filteredUsers = remember { mutableStateListOf<UserData>(UserData()) }
+    var filteredUsers = remember { mutableStateListOf<UserData>() }
     bestResult!!.users.apply {
         filteredUsers.clear()
         forEachIndexed { index, user ->
@@ -122,14 +117,6 @@ fun Search(scrollState: LazyListState, setPadding: (Dp) -> Unit) {
                 filteredUsers.add(user)
             }
         }
-    }
-    refProjects.get().addOnSuccessListener() { snapshot ->
-        projects.clear()
-        for (childSnapshot in snapshot.children) {
-            val item = childSnapshot.getValue(Project::class.java)
-            projects.add(item!!)
-        }
-
     }
     var filteredProjects = remember { mutableStateListOf<Project>() }
     bestResult!!.projects.apply {
@@ -290,7 +277,7 @@ fun Search(scrollState: LazyListState, setPadding: (Dp) -> Unit) {
                                 item {
                                     Column {
                                         filteredProjects.forEachIndexed { index, project ->
-                                            ProjectContainer(project)
+                                            ProjectContainer(project, existsList[index])
                                         }
                                     }
                                 }
@@ -300,7 +287,7 @@ fun Search(scrollState: LazyListState, setPadding: (Dp) -> Unit) {
                         1 -> {
                             LazyColumn(modifier = Modifier.fillMaxSize()) {
                                 itemsIndexed(filteredProjects) { index, project ->
-                                    ProjectContainer(project)
+                                    ProjectContainer(project, existsList[index])
                                 }
                             }
                         }

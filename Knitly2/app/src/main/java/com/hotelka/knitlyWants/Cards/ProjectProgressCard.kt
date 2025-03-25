@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -34,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -51,7 +53,7 @@ import com.hotelka.knitlyWants.ui.theme.white
 @Composable
 @Preview
 fun ProjectProgressCard(project: ProjectsArchive = ProjectsArchive()) {
-    val currentDetail = project.project!!.details?.get(project.progressDetails!!.detail!!)
+    val currentDetail = project.project!!.details?.get(project.detailRows!!.detail!!)
     val category = project.project.category
 
     Card(
@@ -100,16 +102,17 @@ fun ProjectProgressCard(project: ProjectsArchive = ProjectsArchive()) {
                     )
                 )
                 Text(
-                    modifier = Modifier.width(70.dp).padding(top = 5.dp),
+                    modifier = Modifier.width(70.dp).padding(top = 5.dp).heightIn(0.dp, 50.dp),
+                    overflow = TextOverflow.Ellipsis,
                     text = if (project.progress != 1f) currentDetail!!.title!!
                     else stringResource(R.string.projectIsDone),
-                    fontSize = 18.sp,
+                    fontSize = 16.sp,
                     color = textColor,
                 )
                 AnimatedVisibility(visible = project.progress != 1f) {
                     Text(
                         modifier = Modifier.padding(top = 5.dp),
-                        text = "Row${project.progressDetails!!.row!! + 1}",
+                        text = "Row${project.detailRows!!.row!! + 1}",
                         fontSize = 16.sp,
                         color = textColor,
                     )

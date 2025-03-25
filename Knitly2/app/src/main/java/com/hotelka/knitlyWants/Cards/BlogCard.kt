@@ -20,14 +20,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -48,6 +51,24 @@ import com.hotelka.knitlyWants.userData
 @Preview
 @Composable
 fun BlogCard(blog: Blog = Blog()) {
+    var context = LocalContext.current
+    var likes by remember { mutableStateOf(blog.projectData!!.likes) }
+    var likeIcon by remember { mutableStateOf(
+        if (blog.projectData!!.likes.users?.contains(
+                userData.value.userId
+            ) == true
+        ) Icons.Filled.Favorite
+        else Icons.Outlined.FavoriteBorder
+    ) }
+    var likeCount by remember { mutableStateOf(blog.projectData!!.likes.total) }
+    var iconColorFilter by remember { mutableStateOf(
+        if (blog.projectData!!.likes.users?.contains(
+                userData.value.userId
+            ) == true
+        ) ColorFilter.tint(headers_activeElement)
+        else ColorFilter.tint(Color.Gray)
+    ) }
+
     Column(
         horizontalAlignment = Alignment.Start,
         modifier = Modifier
@@ -127,14 +148,24 @@ fun BlogCard(blog: Blog = Blog()) {
                         .clickable {
                             FirebaseDB.sendLikeBlog(
                                 blog.projectData!!.projectId.toString(),
-                                blog.projectData!!.likes
-                            )
+                                likes
+                            ) { sent, like ->
+                                likes = like
+                                if (sent){
+                                    likeCount = likeCount!! + 1
+                                    likeIcon = Icons.Filled.Favorite
+                                    iconColorFilter = ColorFilter.tint(headers_activeElement)
+
+                                } else {
+                                    likeCount = likeCount!! - 1
+                                    likeIcon = Icons.Outlined.FavoriteBorder
+                                    iconColorFilter = ColorFilter.tint(Color.Gray)
+
+                                }
+
+                            }
                         },
-                    colorFilter = if (blog.projectData!!.likes.users?.contains(
-                            userData.value.userId
-                        ) == true
-                    ) ColorFilter.tint(headers_activeElement)
-                    else ColorFilter.tint(Color.Gray)
+                    colorFilter = iconColorFilter
                 )
                 Text(
                     text = blog.projectData!!.likes.total.toString(),

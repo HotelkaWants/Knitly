@@ -50,6 +50,7 @@ data class Comment(
     val userId: String? = "",
     val timestamp: String? = "",
     var likes: Likes = Likes(),
+    var additionalImages: MutableList<String?>? = mutableListOf()
 )
 data class Likes(
     var total: Int? = 0,
@@ -70,7 +71,7 @@ data class ProjectsArchive(
     val project: Project? = Project(),
     var progress: Float = 0f,
     var timeInProgress: String? = "0",
-    var progressDetails: ProgressDetails? = ProgressDetails()
+    var detailRows: DetailRows? = DetailRows()
 )
 
-data class ProgressDetails(var detail: Int? = 0, var row: Int? = 0)
+data class DetailRows(var detail: Int? = 0, var row: Int? = 0)

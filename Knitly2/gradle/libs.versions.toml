@@ -1,5 +1,6 @@
 [versions]
 accompanistInsetsVersion = "0.31.5-beta"
+accompanistSwiperefreshVersion = "0.24.13-rc"
 agp = "8.8.2"
 coilNetworkOkhttp = "3.0.4"
 commonsLang3 = "3.17.0"
@@ -28,8 +29,10 @@ coilCompose = "3.1.0"
 googleidVersion = "1.1.1"
 firebaseAuthVersion = "23.2.0"
 storageKt = "3.1.1"
+firebaseMessagingVersion = "24.1.1"
 [libraries]
 accompanist-insets = { module = "com.google.accompanist:accompanist-insets", version.ref = "accompanistInsetsVersion" }
+accompanist-swiperefresh = { module = "com.google.accompanist:accompanist-swiperefresh", version.ref = "accompanistSwiperefreshVersion" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 
 
@@ -68,6 +71,7 @@ ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx
 
 storage-kt = { module = "io.github.jan-tennert.supabase:storage-kt", version.ref = "storageKt" }
 realtime-kt = { module = "io.github.jan-tennert.supabase:realtime-kt", version.ref = "storageKt" }
+firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging", version.ref = "firebaseMessagingVersion" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

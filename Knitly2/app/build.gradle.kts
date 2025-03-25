@@ -49,6 +49,7 @@ android {
 }
 
 dependencies {
+    implementation (libs.accompanist.swiperefresh)
     implementation(libs.imageCrop)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -64,6 +65,7 @@ dependencies {
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
     implementation(libs.google.firebase.auth)
+    implementation(libs.firebase.messaging)
     testImplementation(libs.junit)
     implementation(libs.commons.lang3)
     implementation (libs.compressor)

@@ -15,8 +15,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -80,6 +78,7 @@ import com.hotelka.knitlyWants.Data.Blog
 import com.hotelka.knitlyWants.Data.Category
 import com.hotelka.knitlyWants.Data.Category.Companion.Crocheting
 import com.hotelka.knitlyWants.Data.Detail
+import com.hotelka.knitlyWants.Data.DetailRows
 import com.hotelka.knitlyWants.Data.Likes
 import com.hotelka.knitlyWants.Data.Note
 import com.hotelka.knitlyWants.Data.Project
@@ -90,10 +89,13 @@ import com.hotelka.knitlyWants.R
 import com.hotelka.knitlyWants.Supbase.getData
 import com.hotelka.knitlyWants.Supbase.getFileFromUri
 import com.hotelka.knitlyWants.Supbase.uploadFile
-import com.hotelka.knitlyWants.SupportingDatabase.RoomDatabase
+import com.hotelka.knitlyWants.SupportingDatabase.SupportingDatabase
+import com.hotelka.knitlyWants.Tools.distributeIncreases
+import com.hotelka.knitlyWants.editableBlog
 import com.hotelka.knitlyWants.editableProject
 import com.hotelka.knitlyWants.imageBitmapToByteArray
 import com.hotelka.knitlyWants.navController
+import com.hotelka.knitlyWants.ui.theme.CustomFabTools
 import com.hotelka.knitlyWants.ui.theme.CustomFloatingActionButton
 import com.hotelka.knitlyWants.ui.theme.LoadingAnimation
 import com.hotelka.knitlyWants.ui.theme.Shapes
@@ -124,6 +126,7 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
     var deleteProjectDialog by remember { mutableStateOf(false) }
 
     var title by remember { mutableStateOf(if (currentProject != null) currentProject.projectData!!.title else if (blog_ != null) blog_.projectData!!.title else "") }
+
     var description by remember { mutableStateOf(if (currentProject != null) currentProject.projectData!!.description else if (blog_ != null) blog_.projectData!!.description else "") }
     var category by remember { mutableStateOf(if (currentProject != null) currentProject.category else Category.Blog) }
     var credits by remember { mutableStateOf(if (currentProject != null) currentProject.credits else if (blog_ != null) blog_.credits else "") }
@@ -143,7 +146,6 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
     var expandedSave by remember { mutableStateOf(false) }
     var saveEnabled by remember { mutableStateOf(false) }
     var expandedRows = remember { mutableStateListOf<Boolean>() }
-
     var creditsInfoExpanded by remember { mutableStateOf(false) }
 
     var details = remember { mutableStateListOf<Detail>() }
@@ -162,6 +164,8 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
             expandedRows.add(true)
         }
     }
+    var lastDetail by remember { mutableStateOf(details.last()) }
+    var lastRow by remember { mutableStateOf(lastDetail.rows.size) }
 
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
@@ -224,6 +228,9 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
         }
 
     var loadingEnabled by remember { mutableStateOf(false) }
+    var calculator by remember { mutableStateOf(false) }
+    var calculateValue by remember { mutableStateOf("Increases") }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -298,8 +305,7 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                         .clickable(onClick = { launcher.launch("image/*") }
                                         )
                                 )
-                            }
-                            else {
+                            } else {
                                 Image(
                                     imageVector = ImageVector.vectorResource(R.drawable.baseline_photo_camera_24),
                                     contentDescription = null,
@@ -384,41 +390,75 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                         }
                                     }
                                 }
-                                TextField(
-                                    value = title!!,
-                                    onValueChange = { title = it },
-                                    maxLines = 1,
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(topEnd = 20.dp, topStart = 20.dp))
-                                        .background(
-                                            Brush.verticalGradient(
-                                                colorStops = arrayOf(
-                                                    Pair(0f, Transparent),
-                                                    Pair(1f, textFieldColor)
+                                Box {
+                                    Row {
+                                        AnimatedVisibility(
+                                            visible = creditsInfoExpanded,
+                                            enter = fadeIn() + scaleIn(),
+                                            exit = fadeOut() + scaleOut(),
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .padding(vertical = 10.dp)
+                                                    .padding(end = 50.dp)
+                                                    .background(
+                                                        white,
+                                                        RoundedCornerShape(
+                                                            20.dp
+                                                        )
+                                                    )
+                                                    .wrapContentWidth()
+                                                    .padding(12.dp)
+                                            ) {
+                                                Text(
+                                                    text = stringResource(R.string.priceInfo),
+                                                    color = textColor
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    TextField(
+                                        value = title!!,
+                                        onValueChange = { title = it },
+                                        maxLines = 1,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(
+                                                RoundedCornerShape(
+                                                    topEnd = 20.dp,
+                                                    topStart = 20.dp
                                                 )
                                             )
+                                            .background(
+                                                Brush.verticalGradient(
+                                                    colorStops = arrayOf(
+                                                        Pair(0f, Transparent),
+                                                        Pair(1f, textFieldColor)
+                                                    )
+                                                )
+                                            )
+                                            .padding(start = 15.dp, end = 15.dp),
+                                        textStyle = TextStyle(fontSize = 18.sp),
+                                        colors = TextFieldDefaults.colors(
+                                            unfocusedLabelColor = textColor,
+                                            unfocusedPlaceholderColor = textColor,
+                                            unfocusedContainerColor = Transparent,
+                                            focusedContainerColor = Transparent,
+                                            focusedTextColor = textColor,
+                                            unfocusedTextColor = textColor
+                                        ),
+                                        label = { Text(stringResource(R.string.title)) },
+                                        keyboardOptions = KeyboardOptions(
+                                            imeAction = ImeAction.Done,
+                                        ),
+                                        keyboardActions = KeyboardActions(
+                                            onDone = {
+                                                keyboard?.hide()
+                                            }
                                         )
-                                        .padding(start = 15.dp, end = 15.dp)
-                                        .fillMaxWidth(),
-                                    textStyle = TextStyle(fontSize = 20.sp),
-                                    colors = TextFieldDefaults.colors(
-                                        unfocusedLabelColor = textColor,
-                                        unfocusedPlaceholderColor = textColor,
-                                        unfocusedContainerColor = Transparent,
-                                        focusedContainerColor = Transparent,
-                                        focusedTextColor = textColor,
-                                        unfocusedTextColor = textColor
-                                    ),
-                                    label = { Text(stringResource(R.string.title)) },
-                                    keyboardOptions = KeyboardOptions(
-                                        imeAction = ImeAction.Done,
-                                    ),
-                                    keyboardActions = KeyboardActions(
-                                        onDone = {
-                                            keyboard?.hide()
-                                        }
                                     )
-                                )
+                                }
                             }
                         }
                         Box {
@@ -698,75 +738,63 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                 )
 
                                 detail.rows.forEachIndexed { index, row ->
-                                    AnimatedVisibility(
-                                        visible = expandedRows[indexD],
-                                        enter = slideInVertically(
-                                            initialOffsetY = {
-                                                it / 2
-                                            },
-                                        ),
-                                        exit = slideOutVertically(
-                                            targetOffsetY = {
-                                                it / 2
-                                            },
-                                        ),
-                                    ) {
-                                        var repeat by remember { mutableStateOf(index + 2) }
-                                        var expanded by remember { mutableStateOf(false) }
-                                        var openRepeat by remember {
-                                            mutableStateOf(
-                                                false
-                                            )
-                                        }
-                                        var images =
-                                            remember { mutableStateListOf<String?>() }
-                                        row.note?.let {
-                                            it.imageUrl.forEach {
-                                                if (!images.contains(it)) images.add(it)
-                                            }
-                                        }
-                                        val launcher =
-                                            rememberLauncherForActivityResult(contract = ActivityResultContracts.GetContent()) { uri ->
-                                                images.add(uri.toString())
-                                                details[indexD] = details[indexD].copy(
-                                                    rows = details[indexD].rows.toMutableList()
-                                                        .apply {
-                                                            this[index] =
-                                                                this[index].copy(
-                                                                    note = row.note!!.copy(
-                                                                        imageUrl = images
-                                                                    )
-                                                                )
-                                                        })
-                                            }
-                                        var isEmpty by remember { mutableStateOf(false) }
-
-                                        var stateBox = rememberSwipeToDismissBoxState(
-                                            confirmValueChange = { it ->
-                                                if (it == SwipeToDismissBoxValue.EndToStart) {
-                                                    details[indexD] =
-                                                        details[indexD].copy(
-                                                            rows = details[indexD].rows.toMutableList()
-                                                                .apply {
-                                                                    removeAt(index)
-                                                                })
-                                                }
-
-                                                it != SwipeToDismissBoxValue.EndToStart
-
-                                            }
+                                    if (detail == lastDetail) lastRow = index
+                                    var repeat by remember { mutableStateOf(index + 2) }
+                                    var expanded by remember { mutableStateOf(false) }
+                                    var openRepeat by remember {
+                                        mutableStateOf(
+                                            false
                                         )
+                                    }
+                                    var images =
+                                        remember { mutableStateListOf<String?>() }
+                                    row.note?.let {
+                                        it.imageUrl.forEach {
+                                            if (!images.contains(it)) images.add(it)
+                                        }
+                                    }
+                                    val launcher =
+                                        rememberLauncherForActivityResult(contract = ActivityResultContracts.GetContent()) { uri ->
+                                            images.add(uri.toString())
+                                            details[indexD] = details[indexD].copy(
+                                                rows = details[indexD].rows.toMutableList()
+                                                    .apply {
+                                                        this[index] =
+                                                            this[index].copy(
+                                                                note = row.note!!.copy(
+                                                                    imageUrl = images
+                                                                )
+                                                            )
+                                                    })
+                                        }
+                                    var isEmpty by remember { mutableStateOf(false) }
+
+                                    var stateBox = rememberSwipeToDismissBoxState(
+                                        confirmValueChange = { it ->
+                                            if (it == SwipeToDismissBoxValue.EndToStart) {
+                                                details[indexD] =
+                                                    details[indexD].copy(
+                                                        rows = details[indexD].rows.toMutableList()
+                                                            .apply {
+                                                                removeAt(index)
+                                                            })
+                                            }
+
+                                            it != SwipeToDismissBoxValue.EndToStart
+
+                                        }
+                                    )
 
 
-                                        SwipeToDismissBox(
-                                            modifier = Modifier
-                                                .wrapContentSize()
-                                                .animateContentSize(),
-                                            state = stateBox,
-                                            enableDismissFromEndToStart = true,
-                                            enableDismissFromStartToEnd = false,
-                                            backgroundContent = {
-
+                                    SwipeToDismissBox(
+                                        modifier = Modifier
+                                            .wrapContentSize()
+                                            .animateContentSize(),
+                                        state = stateBox,
+                                        enableDismissFromEndToStart = true,
+                                        enableDismissFromStartToEnd = false,
+                                        backgroundContent = {
+                                            if (expandedRows[indexD]) {
                                                 if (stateBox.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
                                                     Box(
                                                         contentAlignment = Alignment.Center,
@@ -782,11 +810,11 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                                         )
                                                     }
                                                 }
-
                                             }
+                                        }
 
-                                        ) {
-
+                                    ) {
+                                        if (expandedRows[indexD]) {
                                             Box() {
                                                 Column(
                                                     modifier = Modifier.background(
@@ -889,11 +917,7 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                                             }
                                                         )
                                                     )
-                                                    AnimatedVisibility(
-                                                        visible = row.noteAdded,
-                                                        enter = fadeIn() + scaleIn(),
-                                                        exit = fadeOut() + scaleOut()
-                                                    ) {
+                                                    if (row.noteAdded) {
                                                         Column(
                                                             modifier = Modifier
                                                                 .fillMaxWidth()
@@ -933,6 +957,7 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                                             LazyRow(
                                                                 modifier = Modifier
                                                                     .fillMaxWidth()
+                                                                    .background(textFieldColor)
                                                                     .heightIn(
                                                                         0.dp,
                                                                         200.dp
@@ -948,9 +973,6 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                                                                 RoundedCornerShape(
                                                                                     20.dp
                                                                                 )
-                                                                            )
-                                                                            .animateEnterExit(
-                                                                                exit = fadeOut() + scaleOut()
                                                                             )
                                                                             .combinedClickable(
                                                                                 onClick = {},
@@ -1243,8 +1265,6 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                                 }
                                             }
                                         }
-
-
                                     }
                                 }
 
@@ -1287,7 +1307,8 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                     AnimatedVisibility(
                                         modifier = Modifier
                                             .weight(1f)
-                                            .padding(4.dp),
+                                            .padding(4.dp)
+                                            .imePadding(),
                                         visible = (indexD == details.size - 1),
                                         enter = fadeIn() + scaleIn(),
                                         exit = fadeOut() + scaleOut()
@@ -1429,7 +1450,10 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                 else 0,
                                 projectId = if (currentProject != null) currentProject.projectData!!.projectId
                                 else uniqueUUID,
-                                title = title,
+                                title = if (title?.get(0) == ' ') title!!.removeRange(
+                                    0,
+                                    0
+                                ) else title!!,
                                 date = if (currentProject != null) currentProject.projectData!!.date
                                 else formatted,
                                 description = description,
@@ -1442,7 +1466,7 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                         userData.value.username!!,
                                         imageBitmapToByteArray(imageBitmap!!)
                                     ).toString()
-                                ) else initialImageUri
+                                ) else initialImageUri,
                             ),
                             tool = "${tool}mm",
                             yarns = yarns,
@@ -1491,9 +1515,10 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                             FirebaseDB.updateProject(project)
                         } else FirebaseDB.storeProjectCrocheting(project, uniqueUUID)
                         try {
-                            RoomDatabase(context).deleteDraft(project)
+                            SupportingDatabase(context).deleteDraft(project)
                         } catch (e: Exception) {
                         }
+                        editableProject = null
                     }
                 }
 
@@ -1511,13 +1536,13 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                 else 0,
                                 projectId = if (blog_ != null) blog_.projectData!!.projectId
                                 else uniqueUUID,
-                                title = title,
+                                title = title!!.trim(),
                                 date = if (blog_ != null) blog_.projectData!!.date
                                 else formatted,
                                 description = description,
                                 author = userData.value.username!!,
                                 authorID = userData.value.userId,
-                                cover = if (imageBitmap != null) getData(
+                                cover = if (imageBitmap != null && (initialImageUri?.contains("supabase") == false)) getData(
                                     "blogs",
                                     uploadFile(
                                         "blogs",
@@ -1559,9 +1584,10 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                             FirebaseDB.updateBlog(blog)
                         } else FirebaseDB.storeBlog(blog, uniqueUUID)
                         try {
-                            RoomDatabase(context).deleteBlogDraft(blog)
+                            SupportingDatabase(context).deleteBlogDraft(blog)
                         } catch (e: Exception) {
                         }
+                        editableBlog = null
 
                     }
 
@@ -1580,7 +1606,8 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
 
             imageBitmap?.let {
                 val stream = ByteArrayOutputStream()
-                it.asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, stream) // Use PNG or JPEG format
+                it.asAndroidBitmap()
+                    .compress(Bitmap.CompressFormat.PNG, 100, stream) // Use PNG or JPEG format
                 val byteArray: ByteArray = stream.toByteArray()
                 FileOutputStream(file).use { outputStream ->
                     outputStream.write(byteArray)
@@ -1596,14 +1623,17 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                         category = category,
                         projectData = ProjectData(
                             projectId = if (currentProject != null) currentProject.projectData!!.projectId else uniqueUUID,
-                            title = title,
+                            title = if (title?.get(0) == ' ') title!!.removeRange(
+                                0,
+                                0
+                            ) else title!!,
                             date = formatted,
                             description = description,
                             author = userData.value.username!!,
                             authorID = userData.value.userId,
                             cover = if (imageBitmap != null)
                                 file.absolutePath
-                            else initialImageUri
+                            else initialImageUri,
                         ),
                         tool = "${tool}mm",
                         yarns = yarns,
@@ -1654,9 +1684,9 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
 
                         Log.d(
                             "ImageSaving",
-                            RoomDatabase(context).updateDraft(project).toString()
+                            SupportingDatabase(context).updateDraft(project).toString()
                         )
-                    } else RoomDatabase(context).addProjectDraft(project, uniqueUUID)
+                    } else SupportingDatabase(context).addProjectDraft(project, uniqueUUID)
 
                     navController.popBackStack()
 
@@ -1676,7 +1706,10 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                 else 0,
                                 projectId = if (currentProject != null) currentProject.projectData!!.projectId
                                 else uniqueUUID,
-                                title = title,
+                                title = if (title?.get(0) == ' ') title!!.removeRange(
+                                    0,
+                                    0
+                                ) else title!!,
                                 date = if (currentProject != null) currentProject.projectData!!.date
                                 else formatted,
                                 description = description,
@@ -1709,8 +1742,8 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                 }
                             })
                         if (blog_ != null) {
-                            RoomDatabase(context).updateBlogDraft(blog)
-                        } else RoomDatabase(context).addBlogDraft(blog, uniqueUUID)
+                            SupportingDatabase(context).updateBlogDraft(blog)
+                        } else SupportingDatabase(context).addBlogDraft(blog, uniqueUUID)
                         navController.popBackStack()
                     }
                 }
@@ -1723,7 +1756,7 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
             showAlertDialog = true
         }
         if (showAlertDialog) {
-            SaveAlertDialog(::saveDraft)
+            SaveAlertDialog(::saveDraft, { showAlertDialog = false })
         }
         if (deleteProjectDialog) {
             DeleteAlertDialog(
@@ -1733,13 +1766,13 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                             currentProject.projectData?.projectId,
                             blog.projectData?.authorID
                         )
-                        RoomDatabase(context).deleteDraft(currentProject)
+                        SupportingDatabase(context).deleteDraft(currentProject)
                     } else {
                         FirebaseDB.deleteBlog(
                             blog.projectData?.projectId,
                             blog.projectData?.authorID
                         )
-                        RoomDatabase(context).deleteBlogDraft(blog)
+                        SupportingDatabase(context).deleteBlogDraft(blog)
                     }
                     editableProject = null
                     navController.popBackStack()
@@ -1747,8 +1780,34 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                 { deleteProjectDialog = false }
             )
         }
+        if (category != Category.Blog) {
+            Box(
+                Modifier
+                    .padding(bottom = 70.dp)
+                    .animateContentSize()
+                    .align(Alignment.BottomEnd)
+                    .padding(20.dp)
+            ) {
+                CustomFabTools(
+                    expandable = true,
+                    onFabClick = {
+                        expandedSave = !expandedSave
+                    },
+                    calculatorDecrease = {
+                        calculator = true
+                        calculateValue = "Increases"
+                    },
+                    calculatorIncrease = {
+                        calculator = true
+                        calculateValue = "Decreases"
+                    },
+                    fabIcon = ImageVector.vectorResource(R.drawable.calculator),
+                )
+            }
+        }
         Box(
             Modifier
+                .animateContentSize()
                 .align(Alignment.BottomEnd)
                 .padding(20.dp)
         ) {
@@ -1756,16 +1815,17 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                 expandable = true,
                 saveProjectEnabled = saveEnabled,
                 onFabClick = {
-                    saveEnabled = if (title!!.isEmpty() || (imageBitmap == null && initialImageUri == "") ){
-                        Toast.makeText(
-                            context,
-                            context.getString(R.string.provide),
-                            Toast.LENGTH_LONG
-                        ).show()
-                        false
-                    } else {
-                        true
-                    }
+                    saveEnabled =
+                        if (title!!.isEmpty() || (imageBitmap == null && initialImageUri == "")) {
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.provide),
+                                Toast.LENGTH_LONG
+                            ).show()
+                            false
+                        } else {
+                            true
+                        }
                     when (category) {
                         Category.Crocheting -> {
                             details.forEach { detail ->
@@ -1797,11 +1857,379 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
             )
         }
 
-
+        if (calculator) {
+            Calculator(
+                details = details,
+                lastRow = lastRow,
+                context,
+                onCancel = { calculator = false },
+                calculateValue = calculateValue
+            ) { detailRow, apply ->
+                detailRow.detail?.let {
+                    details[it] =
+                        details[it].copy(
+                            rows = details[it].rows.toMutableList()
+                                .apply {
+                                    detailRow.row?.let { it1 ->
+                                        this[it1] =
+                                            this[it1].copy(
+                                                description = apply
+                                            )
+                                    }
+                                })
+                }
+            }
+        }
         AnimatedVisibility(visible = loadingEnabled) { LoadingAnimation(circleSize = 50.dp) }
 
     }
 
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun Calculator(
+    details: List<Detail>,
+    lastRow: Int,
+    context: Context,
+    calculateValue: String,
+    onCancel: () -> Unit,
+    apply: (DetailRows, String) -> Unit
+) {
+    var errorStitches by remember { mutableStateOf(false) }
+    var valuesError by remember { mutableStateOf(false) }
+    var detailError by remember { mutableStateOf(false) }
+    var rowError by remember { mutableStateOf(false) }
+
+    var detail by remember { mutableStateOf(details.last()) }
+    var applyOnRow by remember { mutableIntStateOf(lastRow) }
+    var stitchesAmount by remember { mutableIntStateOf(1) }
+    var valuesCalculate by remember { mutableIntStateOf(1) }
+    var detailInput by remember { mutableStateOf(detail.title) }
+
+    var result by remember { mutableStateOf(context.getString(R.string.result)) }
+    BasicAlertDialog(
+        onDismissRequest = { onCancel() }
+    ) {
+        Surface(
+            modifier = Modifier
+                .wrapContentWidth()
+                .wrapContentHeight(),
+            shape = MaterialTheme.shapes.large
+        ) {
+            val options = listOf(
+                context.getString(R.string.uniform),
+                context.getString(R.string.start),
+                context.getString(R.string.end)
+            )
+            var selectedOptionText by remember { mutableStateOf(options[0]) }
+
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .animateContentSize()
+            ) {
+                Text(
+                    text = stringResource(R.string.calculate) + " $calculateValue",
+                    modifier = Modifier
+                        .padding(10.dp)
+                        .fillMaxWidth(),
+                    fontSize = 18.sp,
+                    color = textColor
+
+                )
+
+                OutlinedTextField(
+                    modifier = Modifier
+                        .padding(8.dp),
+                    value = stitchesAmount.toString(),
+                    onValueChange = { it ->
+                        if (it.toIntOrNull() != null) {
+                            stitchesAmount = it.toInt()
+                        }
+                        errorStitches = stitchesAmount <= 0
+                    },
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = textFieldColor,
+                        unfocusedContainerColor = textFieldColor,
+                        focusedTextColor = textColor,
+                        unfocusedTextColor = textColor,
+                        focusedLabelColor = textColor,
+                        unfocusedLabelColor = textColor,
+                        errorContainerColor = error
+                    ),
+                    keyboardOptions = KeyboardOptions.Default.copy(
+                        keyboardType = KeyboardType.Number
+                    ),
+                    isError = errorStitches,
+                    label = {
+                        Text(
+                            if (errorStitches) stringResource(R.string.currentStitchesAmount) + "* ${
+                                context.getString(
+                                    R.string.lessThanZero
+                                )
+                            }"
+                            else stringResource(R.string.currentStitchesAmount)
+                        )
+                    }
+
+                )
+
+                OutlinedTextField(
+                    modifier = Modifier
+                        .padding(8.dp),
+                    value = valuesCalculate.toString(),
+                    onValueChange = { it ->
+                        if (it.toIntOrNull() != null) {
+                            valuesCalculate = it.toInt()
+                        }
+                        valuesError = valuesCalculate > stitchesAmount
+
+                    },
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = textFieldColor,
+                        unfocusedContainerColor = textFieldColor,
+                        focusedTextColor = textColor,
+                        unfocusedTextColor = textColor,
+                        focusedLabelColor = textColor,
+                        unfocusedLabelColor = textColor,
+                        errorContainerColor = error
+                    ),
+                    keyboardOptions = KeyboardOptions.Default.copy(
+                        keyboardType = KeyboardType.Number
+                    ),
+                    isError = valuesError,
+                    label = {
+                        Text(
+                            if (valuesError) stringResource(R.string.calculate) + " $calculateValue* " +
+                                    "${stringResource(R.string.mustBeLess)} $stitchesAmount"
+                            else stringResource(R.string.calculate) + " $calculateValue"
+                        )
+                    }
+
+                )
+                Row(Modifier.padding(vertical = 8.dp, horizontal = 10.dp)) {
+                    OutlinedTextField(
+                        modifier = Modifier
+                            .wrapContentWidth()
+                            .weight(1f)
+                            .padding(end = 8.dp),
+                        value = detailInput.toString(),
+                        onValueChange = { it ->
+                            detailInput = it
+                            if (details.isEmpty()) {
+                                detailError = true
+                            } else {
+                                for (it in details) {
+                                    detailError = true
+                                    if (it.title?.replace(" ", "") == detailInput?.replace(
+                                            " ",
+                                            ""
+                                        )
+                                    ) {
+                                        detailError = false
+                                        detail = it
+                                        break
+                                    }
+                                }
+                            }
+                        },
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = textFieldColor,
+                            unfocusedContainerColor = textFieldColor,
+                            focusedTextColor = textColor,
+                            unfocusedTextColor = textColor,
+                            focusedLabelColor = textColor,
+                            unfocusedLabelColor = textColor,
+                            errorContainerColor = error
+                        ),
+                        isError = detailError,
+                        label = {
+                            Text(
+                                if (detailError) stringResource(R.string.detail) + " ${
+                                    stringResource(
+                                        R.string.noSuchDetail
+                                    )
+                                }* "
+                                else stringResource(R.string.detail)
+                            )
+                        }
+                    )
+                    OutlinedTextField(
+                        modifier = Modifier
+                            .wrapContentWidth()
+                            .weight(1f),
+                        value = applyOnRow.toString(),
+                        onValueChange = { it ->
+                            if (it.toIntOrNull() != null) {
+                                applyOnRow = it.toInt()
+                            }
+                            rowError = if (applyOnRow > detail.rows.size) {
+                                true
+                            } else if (applyOnRow <= 0) {
+                                true
+                            } else {
+                                false
+                            }
+                        },
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = textFieldColor,
+                            unfocusedContainerColor = textFieldColor,
+                            focusedTextColor = textColor,
+                            unfocusedTextColor = textColor,
+                            focusedLabelColor = textColor,
+                            unfocusedLabelColor = textColor,
+                            errorContainerColor = error
+                        ),
+                        isError = rowError,
+                        label = {
+                            Text(
+                                if (rowError) "Row* ${stringResource(R.string.noSuchRow)}* "
+                                else "Row"
+                            )
+                        },
+                        keyboardOptions = KeyboardOptions.Default.copy(
+                            keyboardType = KeyboardType.Number
+                        ),
+
+                        )
+                }
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+
+                    Text(
+                        options[0],
+                        fontWeight = FontWeight.Medium,
+                        color = if (selectedOptionText == options[0]) white
+                        else textColor,
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .clip(Shapes.small)
+                            .background(
+                                if (selectedOptionText == options[0]) accent_secondary
+                                else secondary
+                            )
+                            .clickable {
+                                selectedOptionText = options[0]
+                            }
+                            .padding(vertical = 6.dp, horizontal = 14.dp)
+
+                    )
+                    Text(
+                        options[1],
+                        fontWeight = FontWeight.Medium,
+                        color = if (selectedOptionText == options[1]) white
+                        else textColor,
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .clip(Shapes.small)
+                            .background(
+                                if (selectedOptionText == options[1]) accent_secondary
+                                else secondary
+                            )
+                            .clickable {
+                                selectedOptionText = options[1]
+                            }
+                            .padding(vertical = 6.dp, horizontal = 14.dp)
+
+                    )
+                    Text(
+                        options[2],
+                        fontWeight = FontWeight.Medium,
+                        color = if (selectedOptionText == options[2]) white
+                        else textColor,
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .clip(Shapes.small)
+                            .background(
+                                if (selectedOptionText == options[2]) accent_secondary
+                                else secondary
+                            )
+                            .clickable {
+                                selectedOptionText = options[2]
+                            }
+                            .padding(vertical = 6.dp, horizontal = 14.dp)
+                    )
+
+                }
+                Button(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = headers_activeElement),
+                    onClick = {
+                        if (!errorStitches && !valuesError) {
+                            result = distributeIncreases(
+                                context, stitchesAmount, valuesCalculate, selectedOptionText
+                            )
+                        }
+                    }
+                ) {
+                    Text(stringResource(R.string.calculate))
+
+                }
+
+                Text(
+                    text = result,
+                    modifier = Modifier
+                        .padding(horizontal = 10.dp)
+                        .padding(bottom = 5.dp)
+                        .fillMaxWidth()
+                        .wrapContentHeight(),
+                    fontSize = 16.sp,
+                    color = textColor
+
+                )
+
+                Row(
+                    Modifier.wrapContentSize(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Button(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = headers_activeElement),
+                        onClick = {
+                            onCancel()
+                        }
+                    ) {
+                        Text(stringResource(R.string.cancel))
+
+                    }
+                    Button(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = 8.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor =
+                            if (!errorStitches && !valuesError && !detailError && !rowError && result != context.getString(
+                                    R.string.result
+                                )
+                            ) {
+                                headers_activeElement
+                            } else Gray
+                        ),
+                        onClick = {
+                            if (!errorStitches && !valuesError && !detailError && !rowError && result != context.getString(
+                                    R.string.result
+                                )
+                            ) {
+                                apply(DetailRows(details.indexOf(detail), applyOnRow - 1), result)
+                                onCancel()
+                            }
+                        }
+                    ) {
+                        Text(stringResource(R.string.apply))
+
+                    }
+                }
+            }
+        }
+
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1864,9 +2292,9 @@ fun DeleteAlertDialog(onDelete: () -> Unit, onCancel: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SaveAlertDialog(onSaveDraft: () -> Unit) {
+fun SaveAlertDialog(onSaveDraft: () -> Unit, onDismiss: () -> Unit) {
     BasicAlertDialog(
-        onDismissRequest = { }
+        onDismissRequest = { onDismiss() }
     ) {
         Surface(
             modifier = Modifier

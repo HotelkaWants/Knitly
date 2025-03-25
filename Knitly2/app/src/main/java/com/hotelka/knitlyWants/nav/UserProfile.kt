@@ -66,9 +66,9 @@ fun UserProfile(user: UserData) {
         snapshot.children.forEach { project ->
             var id = project.value
             refProjects.child(id.toString()).get().addOnSuccessListener {
-                var project = it.getValue(Project::class.java)!!
+                var project = it.getValue(Project::class.java)
                 if (!usersProjects.contains(project)){
-                    usersProjects.add(project)
+                    project?.let { element -> usersProjects.add(element) }
                 }
             }
         }

@@ -1,5 +1,6 @@
 package com.hotelka.knitlyWants.nav
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -22,134 +23,144 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
+import com.google.accompanist.swiperefresh.SwipeRefresh
+import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import com.hotelka.knitlyWants.Cards.BlogCard
 import com.hotelka.knitlyWants.Cards.ProjectContainer
-import com.hotelka.knitlyWants.Data.Blog
-import com.hotelka.knitlyWants.Data.Project
 import com.hotelka.knitlyWants.Data.UserData
-import com.hotelka.knitlyWants.FirebaseUtils.BLOGS
-import com.hotelka.knitlyWants.FirebaseUtils.PROJECTS
+import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB
+import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB.Companion.refProjectsInProgress
 import com.hotelka.knitlyWants.R
+import com.hotelka.knitlyWants.SupportingDatabase.SupportingDatabase
 import com.hotelka.knitlyWants.editableProject
 import com.hotelka.knitlyWants.navController
 import com.hotelka.knitlyWants.ui.theme.accent_secondary
 import com.hotelka.knitlyWants.ui.theme.textColor
 import com.hotelka.knitlyWants.ui.theme.white
+import com.hotelka.knitlyWants.userData
 import com.hotelka.knitlyWants.userWatching
 import com.hotelka.knitlyWants.users
+import kotlinx.coroutines.delay
 
 
 @Composable
 fun HomeScreen() {
-    var projects = remember { mutableStateListOf<Project>() }
-    FirebaseDatabase.getInstance().getReference().child(PROJECTS).get().addOnSuccessListener{snapshot ->
-        for (childSnapshot in snapshot.children) {
-            val item = childSnapshot.getValue(Project::class.java)
-            projects.add(item!!)
+    val context = LocalContext.current
+    val db = SupportingDatabase(context)
+    var projects by remember { mutableStateOf(db.getAllProjects())}
+    Log.d("projectsHome", db.getAllProjects().toString())
+    var blogs = db.getAllBlog()
+    var refreshing by remember { mutableStateOf(true) }
+
+    LaunchedEffect(refreshing) {
+        if (refreshing) {
+            delay(2000)
+            refreshing = false
         }
     }
-    var blogs = remember { mutableStateListOf<Blog>() }
-    FirebaseDatabase.getInstance().getReference().child(BLOGS).get().addOnSuccessListener{snapshot ->
-        for (childSnapshot in snapshot.children) {
-            val item = childSnapshot.getValue(Blog::class.java)
-            blogs.add(item!!)
-        }
-    }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(10.dp)
-                .clip(RoundedCornerShape(20.dp))
-                .background(Color(0xFFF5F5F5))
-        ) {
-            item {
-                LazyRow(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                ) {
-                    items(users.value) {
-                        UserItem(it)
+    SwipeRefresh(
+        state = rememberSwipeRefreshState(isRefreshing = refreshing),
+        onRefresh = {
+            refreshing = true
+            FirebaseDB.createSupportingDatabase(context)
+            projects = db.getAllProjects()
+            blogs = db.getAllBlog()
+            users.value = db.getAllUsers()
+                    },
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(10.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color(0xFFF5F5F5))
+            ) {
+                item {
+                    LazyRow(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                    ) {
+                        items(users.value) {
+                            if (it.userId != userData.value.userId) UserItem(it)
+                        }
                     }
+
                 }
 
-            }
-
-            item {
-                Text(
-                    text = stringResource(R.string.news),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(
-                            RoundedCornerShape(
-                                topEnd = 20.dp,
-                                topStart = 20.dp,
-                                bottomEnd = 20.dp
+                item {
+                    Text(
+                        text = stringResource(R.string.news),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(
+                                RoundedCornerShape(
+                                    topEnd = 20.dp,
+                                    topStart = 20.dp,
+                                    bottomEnd = 20.dp
+                                )
                             )
-                        )
-                        .background(accent_secondary)
-                        .padding(10.dp),
-                    fontSize = 28.sp,
-                    color = white
-                )
-            }
-            item{
-                LazyRow(modifier = Modifier.padding(10.dp)) {
-                    itemsIndexed(blogs){index, blog ->
-                        BlogCard(blog)
+                            .background(accent_secondary)
+                            .padding(10.dp),
+                        fontSize = 28.sp,
+                        color = white
+                    )
+                }
+                item {
+                    LazyRow(modifier = Modifier.padding(10.dp)) {
+                        itemsIndexed(blogs) { index, blog ->
+                            BlogCard(blog)
+                        }
                     }
                 }
-            }
-            item {
-                Text(
-                    text = stringResource(R.string.inspiration),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(
-                            RoundedCornerShape(
-                                topEnd = 20.dp,
-                                topStart = 20.dp,
-                                bottomEnd = 20.dp
+                item {
+                    Text(
+                        text = stringResource(R.string.inspiration),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(
+                                RoundedCornerShape(
+                                    topEnd = 20.dp,
+                                    topStart = 20.dp,
+                                    bottomEnd = 20.dp
+                                )
                             )
-                        )
-                        .background(accent_secondary)
-                        .padding(10.dp),
-                    fontSize = 28.sp,
-                    color = white
-                )
+                            .background(accent_secondary)
+                            .padding(10.dp),
+                        fontSize = 28.sp,
+                        color = white
+                    )
+                }
+                itemsIndexed(projects, key = {index, item -> item.projectData!!.projectId!!}) { index, project ->
+
+                    ProjectContainer(project, false)
+                }
             }
-            itemsIndexed(projects) { index, project ->
-                ProjectContainer(project)
+            FloatingActionButton(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .wrapContentSize()
+                    .align(Alignment.BottomEnd),
+                onClick = {
+                    editableProject = null
+                    navController.navigate("createProject")
+                },
+                containerColor = accent_secondary,
+                shape = RoundedCornerShape(
+                    topStart = 30.dp,
+                    topEnd = 30.dp,
+                    bottomStart = 30.dp
+                ),
+                elevation = FloatingActionButtonDefaults.elevation(10.dp)
+            ) {
+                Icon(imageVector = Icons.Filled.Add, contentDescription = "add", tint = white)
             }
-        }
-        FloatingActionButton(
-            modifier = Modifier
-                .padding(20.dp)
-                .wrapContentSize()
-                .align(Alignment.BottomEnd),
-            onClick = {
-                editableProject = null
-                navController.navigate("createProject")
-            },
-            containerColor = accent_secondary,
-            shape = RoundedCornerShape(
-                topStart = 30.dp,
-                topEnd = 30.dp,
-                bottomStart = 30.dp
-            ),
-            elevation = FloatingActionButtonDefaults.elevation(10.dp)
-        ) {
-            Icon(imageVector = Icons.Filled.Add, contentDescription = "add", tint = white)
         }
     }
 }
@@ -161,7 +172,7 @@ fun UserItem(user: UserData) {
         modifier = Modifier
             .padding(10.dp)
             .background(Color.Transparent)
-            .clickable{
+            .clickable {
                 userWatching = user
                 navController.navigate("userProfile")
             },

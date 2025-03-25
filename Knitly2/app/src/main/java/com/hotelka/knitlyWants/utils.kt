@@ -44,7 +44,11 @@ data class LinkInfos(
     val end: Int
 )
 
-
+fun String.intOrString() = try {
+    toInt()
+} catch(e: NumberFormatException) {
+    this
+}
 fun imageBitmapToByteArray(imageBitmap: ImageBitmap): ByteArray {
     // Step 1: Convert ImageBitmap to Bitmap
     val bitmap: Bitmap = imageBitmap.asAndroidBitmap()

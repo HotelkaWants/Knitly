@@ -44,7 +44,7 @@ import androidx.compose.ui.unit.dp
 import com.hotelka.knitlyWants.Cards.TutorialCard
 import com.hotelka.knitlyWants.Data.HistoryTutorialsData
 import com.hotelka.knitlyWants.R
-import com.hotelka.knitlyWants.SupportingDatabase.RoomDatabase
+import com.hotelka.knitlyWants.SupportingDatabase.SupportingDatabase
 import com.hotelka.knitlyWants.ui.theme.SearchTabs
 import com.hotelka.knitlyWants.ui.theme.basic
 import com.hotelka.knitlyWants.ui.theme.darkBasic
@@ -63,7 +63,7 @@ fun prev() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Tutorials() {
-    val roomDatabase = RoomDatabase(LocalContext.current)
+    val supportingDatabase = SupportingDatabase(LocalContext.current)
     var searchHistory = remember { mutableStateListOf<HistoryTutorialsData>() }
 //    searchHistory.addAll(roomDatabase.getHistoryTutorialsList())
     var query by remember { mutableStateOf("") }

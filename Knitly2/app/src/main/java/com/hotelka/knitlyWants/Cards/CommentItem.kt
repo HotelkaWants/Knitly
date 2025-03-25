@@ -2,7 +2,10 @@ package com.hotelka.knitlyWants.Cards
 
 import android.util.Log
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
@@ -52,14 +55,15 @@ fun CommentItem(
     userData: UserData,
     commentText: String,
     timestamp: String,
-    likes: Likes = Likes()
+    likes: Likes = Likes(),
+    additionalImages: MutableList<String?>
 ) {
     var liked by remember { mutableStateOf(likes.users!!.contains(com.hotelka.knitlyWants.userData.value.userId)) }
-    var likeCount by remember { mutableStateOf(likes.total!!) }
+    var likeCount by remember { mutableIntStateOf(likes.total!!) }
 
     Row(
         modifier = Modifier
-            .padding(8.dp)
+            .padding(horizontal = 8.dp)
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .background(textFieldColor)
@@ -67,7 +71,7 @@ fun CommentItem(
 
     ) {
         AsyncImage(
-            model = if (com.hotelka.knitlyWants.userData.value.profilePictureUrl != "") com.hotelka.knitlyWants.userData.value.profilePictureUrl
+            model = if (userData.profilePictureUrl != "") userData.profilePictureUrl
             else R.drawable.baseline_account_circle_24,
             contentDescription = "Profile Image",
             modifier = Modifier
@@ -154,6 +158,27 @@ fun CommentItem(
             }
             Spacer(modifier = Modifier.height(5.dp))
 
+            LazyRow (
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(0.dp, 200.dp)
+            ){
+                itemsIndexed(additionalImages){ index, uri ->
+                    AsyncImage(
+                        model = uri,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(end = 10.dp)
+                            .clip(
+                                RoundedCornerShape(
+                                    20.dp
+                                )
+                            ),
+                        contentScale = ContentScale.FillWidth,
+                        contentDescription = "Comment Image"
+                    )
+                }
+            }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
             ) {

@@ -99,5 +99,26 @@
     <string name="saveChanges">Save Changes</string>
     <string name="leaveCredits">Leave links to the source, author or your social media</string>
     <string name="chat">Chat</string>
+    <string name="calculateDecrease">Calculate Decreases</string>
+    <string name="calculateIncreases">Calculate Increases</string>
+    <string name="calculate">Calculate</string>
+    <string name="apply">Apply</string>
+    <string name="result">Result</string>
+    <string name="currentStitchesAmount">Current Stitches Amount</string>
+    <string name="neededIncreasesDecreases">Amount</string>
+    <string name="lessThanZero">Must be more than 0</string>
+    <string name="mustBeMore">Must be more than</string>
+    <string name="mustBeLess">Must be less than or equal to</string>
+    <string name="noSuchRow">No such row in details</string>
+    <string name="noSuchDetail">No such detail</string>
+    <string name="emphasis">Emphasis</string>
+    <string name="uniform">Uniform</string>
+    <string name="start">Start</string>
+    <string name="end">End</string>
+    <string name="sc">sc</string>
+    <string name="inc">inc</string>
+    <string name="center">Center</string>
+    <string name="price">Price</string>
+    <string name="priceInfo">By specifying the price, you confirm that the finished product is available for sale</string>
 
 </resources>

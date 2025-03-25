@@ -91,16 +91,16 @@ import com.hotelka.knitlyWants.Data.UserData
 import com.hotelka.knitlyWants.FirebaseUtils.CHILD_USERS
 import com.hotelka.knitlyWants.FirebaseUtils.FirebaseAuthenticationHelper
 import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB
-import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB.Companion.collectUsersRealtime
 import com.hotelka.knitlyWants.Supbase.key
 import com.hotelka.knitlyWants.Supbase.url
+import com.hotelka.knitlyWants.SupportingDatabase.SupportingDatabase
 import com.hotelka.knitlyWants.nav.CreateProjectScreen
+import com.hotelka.knitlyWants.nav.CurrentUserProfileScreen
 import com.hotelka.knitlyWants.nav.DashBoard
+import com.hotelka.knitlyWants.nav.EditProfile
 import com.hotelka.knitlyWants.nav.HomeScreen
 import com.hotelka.knitlyWants.nav.ProjectOverview
 import com.hotelka.knitlyWants.nav.Tutorials
-import com.hotelka.knitlyWants.nav.CurrentUserProfileScreen
-import com.hotelka.knitlyWants.nav.EditProfile
 import com.hotelka.knitlyWants.nav.UserProfile
 import com.hotelka.knitlyWants.nav.WorkingOnProject
 import com.hotelka.knitlyWants.ui.theme.KnitlyTheme
@@ -139,26 +139,22 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         FirebaseApp.initializeApp(this)
         firebaseAuth = FirebaseAuth.getInstance()
-
         setContent {
             KnitlyTheme {
-                users = remember { mutableStateOf(emptyList<UserData>()) }
                 userData = remember { mutableStateOf(UserData()) }
                 if (firebaseAuth.currentUser == null) {
                     startActivity(Intent(this@MainActivity, RegisterActivity::class.java))
                     finish()
                 } else {
                     LaunchedEffect(Unit) {
-                        collectUsersRealtime { user ->
-                            users.value += user
-                        }
-
                         getUser()
                     }
+                    users = remember { mutableStateOf(SupportingDatabase(baseContext).getAllUsers()) }
+
                     Surface(color = basic) {
+                        FirebaseDB.createSupportingDatabase(baseContext)
                         navController = rememberNavController()
                         Knitly(navController)
-
                     }
 
                 }
@@ -479,18 +475,10 @@ class MainActivity : ComponentActivity() {
 
                         var account by remember { mutableStateOf<UserData?>(null) }
                         if (userData.value.linkedAccountsId.toString() != "") {
-                            FirebaseDB.refUsers.child(userData.value.linkedAccountsId.toString())
-                                .addValueEventListener(object : ValueEventListener {
-                                    override fun onDataChange(snapshot: DataSnapshot) {
-                                        account =
-                                            snapshot.getValue<UserData>(UserData::class.java)
-
-                                    }
-
-                                    override fun onCancelled(error: DatabaseError) {
-                                    }
-
-                                })
+                            FirebaseDB.refUsers.child(userData.value.linkedAccountsId.toString()).get().addOnSuccessListener{
+                                account =
+                                    it.getValue<UserData>(UserData::class.java)
+                            }
                         }
                         if (account != null) {
                             Row(

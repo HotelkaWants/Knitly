@@ -36,9 +36,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.ValueEventListener
+import com.google.accompanist.swiperefresh.SwipeRefresh
+import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import com.hotelka.knitlyWants.Cards.DraftCard
 import com.hotelka.knitlyWants.Cards.ProjectProgressCard
 import com.hotelka.knitlyWants.Data.Blog
@@ -47,7 +46,7 @@ import com.hotelka.knitlyWants.Data.ProjectsArchive
 import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB
 import com.hotelka.knitlyWants.FirebaseUtils.PROJECTS
 import com.hotelka.knitlyWants.R
-import com.hotelka.knitlyWants.SupportingDatabase.RoomDatabase
+import com.hotelka.knitlyWants.SupportingDatabase.SupportingDatabase
 import com.hotelka.knitlyWants.ui.theme.Search
 import com.hotelka.knitlyWants.ui.theme.accent_secondary
 import com.hotelka.knitlyWants.ui.theme.basic
@@ -55,8 +54,7 @@ import com.hotelka.knitlyWants.ui.theme.headers_activeElement
 import com.hotelka.knitlyWants.ui.theme.textColor
 import com.hotelka.knitlyWants.ui.theme.white
 import com.hotelka.knitlyWants.userData
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.delay
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @OptIn(
@@ -66,27 +64,22 @@ import java.time.format.DateTimeFormatter
 @Preview
 @Composable
 fun DashBoard() {
-    val dateTimeStrToLocalDateTime: (String) -> LocalDateTime = {
-        LocalDateTime.parse(it, DateTimeFormatter.ofPattern("HH:mm, dd.MM.yyyy"))
-    }
-
     var usersDrafts = remember { mutableStateListOf<Any>() }
-    usersDrafts.addAll(RoomDatabase(LocalContext.current).getAllProjectsDraft())
-    usersDrafts.addAll(RoomDatabase(LocalContext.current).getAllBlogDrafts())
-    var sortedDrafts = remember { mutableStateOf(
-        usersDrafts.sortedWith(compareBy {
-            when(it){
-                is Blog -> it.projectData?.date
-                is Project -> it.projectData?.date
-                else -> throw IllegalArgumentException("")
-            }
-        }).toMutableList()
-    ) }
+    usersDrafts.addAll(SupportingDatabase(LocalContext.current).getAllProjectsDraft())
+    usersDrafts.addAll(SupportingDatabase(LocalContext.current).getAllBlogDrafts())
+
     val projectsInProgress = remember { mutableStateListOf<ProjectsArchive>() }
 
     var projectsInProgressCount by remember { mutableIntStateOf(0) }
     var projectsCompletedCount by remember { mutableIntStateOf(0) }
+    var refreshing by remember { mutableStateOf(true) }
 
+    LaunchedEffect(refreshing) {
+        if (refreshing) {
+            delay(2000)
+            refreshing = false
+        }
+    }
     LaunchedEffect(Unit) {
         FirebaseDB.collectCurrentUserProjectsWorks { project ->
             projectsInProgress.add(project)
@@ -96,57 +89,57 @@ fun DashBoard() {
     }
 
     var projectsCreatedCount by remember { mutableIntStateOf(0) }
-    FirebaseDB.refUsers.child(userData.value.userId).child(PROJECTS).addValueEventListener(object : ValueEventListener{
-        override fun onDataChange(snapshot: DataSnapshot) {
-            projectsCreatedCount = snapshot.childrenCount.toInt()
-        }
-
-        override fun onCancelled(error: DatabaseError) {
-
-        }
-
-    })
+    FirebaseDB.refUsers.child(userData.value.userId).child(PROJECTS).get().addOnSuccessListener {
+        projectsCreatedCount = it.childrenCount.toInt()
+    }
     val scrollState = rememberLazyListState()
     var paddingFromSearch by remember { mutableStateOf(70.dp) }
-    Surface(color = basic) {
-        Box(
-            modifier = Modifier
-                .padding(10.dp)
-                .fillMaxSize()
-                .background(Transparent)
-        ) {
-            Search(scrollState, { it -> paddingFromSearch = it })
+    SwipeRefresh(
+        state = rememberSwipeRefreshState(isRefreshing = refreshing),
+        onRefresh = {
+            refreshing = true
 
-            LazyColumn(
+        },
+    ) {
+        Surface(color = basic) {
+            Box(
                 modifier = Modifier
+                    .padding(10.dp)
+                    .fillMaxSize()
                     .background(Transparent)
-                    .padding(top = paddingFromSearch)
-                    .padding(),
-                scrollState
             ) {
-                item {
-                    AnimatedVisibility(
-                        visible = usersDrafts.isNotEmpty()
-                    ) {
-                        Text(
-                            fontSize = 25.sp,
-                            modifier = Modifier
-                                .background(basic)
-                                .fillMaxWidth()
-                                .padding(horizontal = 10.dp)
-                                .clip(
-                                    RoundedCornerShape(
-                                        topEnd = 20.dp,
-                                        topStart = 20.dp,
-                                        bottomEnd = 20.dp
+                Search(scrollState, { it -> paddingFromSearch = it })
+
+                LazyColumn(
+                    modifier = Modifier
+                        .background(Transparent)
+                        .padding(top = paddingFromSearch)
+                        .padding(),
+                    scrollState
+                ) {
+                    item {
+                        AnimatedVisibility(
+                            visible = usersDrafts.isNotEmpty()
+                        ) {
+                            Text(
+                                fontSize = 25.sp,
+                                modifier = Modifier
+                                    .background(basic)
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 10.dp)
+                                    .clip(
+                                        RoundedCornerShape(
+                                            topEnd = 20.dp,
+                                            topStart = 20.dp,
+                                            bottomEnd = 20.dp
+                                        )
                                     )
-                                )
-                                .background(accent_secondary) // Replace with your drawable oval
-                                .padding(10.dp),
-                            text = stringResource(R.string.myDrafts),
-                            color = white
-                        )
-                    }
+                                    .background(accent_secondary) // Replace with your drawable oval
+                                    .padding(10.dp),
+                                text = stringResource(R.string.myDrafts),
+                                color = white
+                            )
+                        }
                         LazyRow(
                             modifier = Modifier
                                 .background(basic)
@@ -157,16 +150,46 @@ fun DashBoard() {
                             horizontalArrangement = Arrangement.SpaceEvenly
                         ) {
                             itemsIndexed(usersDrafts) { index, draft ->
-                                when(draft){
+                                when (draft) {
                                     is Blog -> DraftCard(null, draft)
                                     is Project -> DraftCard(draft, null)
                                 }
                             }
                         }
 
-                    AnimatedVisibility(
-                        visible = projectsInProgress.isNotEmpty()
-                    ) {
+                        AnimatedVisibility(
+                            visible = projectsInProgress.isNotEmpty()
+                        ) {
+                            Text(
+                                fontSize = 25.sp,
+                                modifier = Modifier
+                                    .background(basic)
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 10.dp)
+                                    .clip(
+                                        RoundedCornerShape(
+                                            topEnd = 20.dp,
+                                            topStart = 20.dp,
+                                            bottomEnd = 20.dp
+                                        )
+                                    )
+                                    .background(accent_secondary) // Replace with your drawable oval
+                                    .padding(10.dp),
+                                text = stringResource(R.string.myProjects),
+                                color = white
+                            )
+                        }
+                        LazyRow(
+                            modifier = Modifier
+                                .background(basic)
+                                .fillMaxWidth()
+                                .padding(vertical = 10.dp)
+                        ) {
+                            items(projectsInProgress) {
+                                ProjectProgressCard(it)
+                            }
+                        }
+
                         Text(
                             fontSize = 25.sp,
                             modifier = Modifier
@@ -182,55 +205,109 @@ fun DashBoard() {
                                 )
                                 .background(accent_secondary) // Replace with your drawable oval
                                 .padding(10.dp),
-                            text = stringResource(R.string.myProjects),
+                            text = stringResource(R.string.statics),
                             color = white
                         )
-                    }
-                    LazyRow(
-                        modifier = Modifier
-                            .background(basic)
-                            .fillMaxWidth()
-                            .padding(vertical = 10.dp)
-                    ) {
-                        items(projectsInProgress) {
-                            ProjectProgressCard(it)
-                        }
-                    }
+                        Row(
+                            modifier = Modifier
+                                .background(basic)
+                                .fillMaxWidth()
+                                .padding(10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
 
-                    Text(
-                        fontSize = 25.sp,
-                        modifier = Modifier
-                            .background(basic)
-                            .fillMaxWidth()
-                            .padding(horizontal = 10.dp)
-                            .clip(
-                                RoundedCornerShape(
-                                    topEnd = 20.dp,
-                                    topStart = 20.dp,
-                                    bottomEnd = 20.dp
+                            Column(
+                                modifier = Modifier
+                                    .wrapContentSize()
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(headers_activeElement)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.projectsComplete),
+                                    modifier = Modifier
+                                        .padding(end = 20.dp, start = 10.dp)
+                                        .padding(top = 10.dp),
+                                    fontSize = 14.sp,
+                                    color = white,
+                                    style = TextStyle.Default.copy(
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 )
-                            )
-                            .background(accent_secondary) // Replace with your drawable oval
-                            .padding(10.dp),
-                        text = stringResource(R.string.statics),
-                        color = white
-                    )
-                    Row(
-                        modifier = Modifier
-                            .background(basic)
-                            .fillMaxWidth()
-                            .padding(10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
+                                Box(
+                                    modifier = Modifier
+                                        .padding(vertical = 20.dp)
+                                        .align(Alignment.CenterHorizontally)
+                                        .padding(30.dp)
+                                ) {
+                                    Text(
+                                        modifier = Modifier
+                                            .drawBehind {
+                                                drawCircle(
+                                                    style = Stroke(
+                                                        width = 5f
+                                                    ),
+                                                    color = white,
+                                                    radius = this.size.maxDimension
+                                                )
+                                            },
+                                        text = projectsCompletedCount.toString(),
+                                        fontSize = 30.sp,
+                                        color = white
+                                    )
+                                }
+                            }
 
+                            Column(
+                                modifier = Modifier
+                                    .wrapContentSize()
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(accent_secondary),
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.projectsInProgress),
+                                    modifier = Modifier
+                                        .padding(end = 20.dp, start = 10.dp)
+                                        .padding(top = 10.dp),
+                                    fontSize = 13.sp,
+                                    color = white,
+                                    style = TextStyle.Default.copy(
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .padding(vertical = 20.dp)
+                                        .align(Alignment.CenterHorizontally)
+                                        .padding(30.dp)
+                                ) {
+                                    Text(
+                                        modifier = Modifier
+                                            .drawBehind {
+                                                drawCircle(
+                                                    style = Stroke(
+                                                        width = 5f
+                                                    ),
+                                                    color = white,
+                                                    radius = this.size.maxDimension
+                                                )
+                                            },
+                                        text = projectsInProgressCount.toString(),
+                                        fontSize = 30.sp,
+                                        color = white
+                                    )
+                                }
+                            }
+                        }
                         Column(
                             modifier = Modifier
-                                .wrapContentSize()
+                                .background(basic)
+                                .padding(10.dp)
+                                .fillMaxWidth()
                                 .clip(RoundedCornerShape(20.dp))
-                                .background(headers_activeElement)
+                                .background(textColor)
                         ) {
                             Text(
-                                text = stringResource(R.string.projectsComplete),
+                                text = stringResource(R.string.projectsCreated),
                                 modifier = Modifier
                                     .padding(end = 20.dp, start = 10.dp)
                                     .padding(top = 10.dp),
@@ -257,101 +334,16 @@ fun DashBoard() {
                                                 radius = this.size.maxDimension
                                             )
                                         },
-                                    text = projectsCompletedCount.toString(),
+                                    text = projectsCreatedCount.toString(),
                                     fontSize = 30.sp,
                                     color = white
                                 )
                             }
-                        }
-
-                        Column(
-                            modifier = Modifier
-                                .wrapContentSize()
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(accent_secondary),
-                        ) {
-                            Text(
-                                text = stringResource(R.string.projectsInProgress),
-                                modifier = Modifier
-                                    .padding(end = 20.dp, start = 10.dp)
-                                    .padding(top = 10.dp),
-                                fontSize = 13.sp,
-                                color = white,
-                                style = TextStyle.Default.copy(
-                                    fontWeight = FontWeight.Bold
-                                )
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .padding(vertical = 20.dp)
-                                    .align(Alignment.CenterHorizontally)
-                                    .padding(30.dp)
-                            ) {
-                                Text(
-                                    modifier = Modifier
-                                        .drawBehind {
-                                            drawCircle(
-                                                style = Stroke(
-                                                    width = 5f
-                                                ),
-                                                color = white,
-                                                radius = this.size.maxDimension
-                                            )
-                                        },
-                                    text = projectsInProgressCount.toString(),
-                                    fontSize = 30.sp,
-                                    color = white
-                                )
-                            }
-                        }
-                    }
-                    Column(
-                        modifier = Modifier
-                            .background(basic)
-                            .padding(10.dp)
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(textColor)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.projectsCreated),
-                            modifier = Modifier
-                                .padding(end = 20.dp, start = 10.dp)
-                                .padding(top = 10.dp),
-                            fontSize = 14.sp,
-                            color = white,
-                            style = TextStyle.Default.copy(
-                                fontWeight = FontWeight.Bold
-                            )
-                        )
-                        Box(
-                            modifier = Modifier
-                                .padding(vertical = 20.dp)
-                                .align(Alignment.CenterHorizontally)
-                                .padding(30.dp)
-                        ) {
-                            Text(
-                                modifier = Modifier
-                                    .drawBehind {
-                                        drawCircle(
-                                            style = Stroke(
-                                                width = 5f
-                                            ),
-                                            color = white,
-                                            radius = this.size.maxDimension
-                                        )
-                                    },
-                                text = projectsCreatedCount.toString(),
-                                fontSize = 30.sp,
-                                color = white
-                            )
                         }
                     }
                 }
             }
         }
-
-
     }
 }
 

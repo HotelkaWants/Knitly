@@ -33,7 +33,139 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.hotelka.knitlyWants.R
+@Composable
+fun CustomFabTools(
+    expandable: Boolean,
+    calculatorDecrease: () -> Unit,
+    onFabClick: () -> Unit,
+    calculatorIncrease: () -> Unit,
+    fabIcon: ImageVector,
+) {
+    var isExpanded by remember { mutableStateOf(false) }
+    if (!expandable) {
+        isExpanded = false
+    }
 
+    val fabSize = 52.dp
+    val expandedFabWidth by animateDpAsState(
+        targetValue = if (isExpanded) 200.dp else fabSize,
+        animationSpec = spring(dampingRatio = 3f)
+    )
+    val expandedFabHeight by animateDpAsState(
+        targetValue = if (isExpanded) 60.dp else fabSize,
+        animationSpec = spring(dampingRatio = 3f)
+    )
+
+    Column {
+        Box(
+            modifier = Modifier
+                .offset(y = (25).dp)
+                .size(
+                    width = expandedFabWidth,
+                    height = (animateDpAsState(
+                        if (isExpanded) 180.dp else 0.dp,
+                        animationSpec = spring(dampingRatio = 4f)
+                    )).value
+                )
+                .background(
+                    white,
+                    shape = RoundedCornerShape(18.dp)
+                )
+                .padding(20.dp)
+
+        ) {
+            Column {
+                    Row(
+                        Modifier.clickable {
+                            calculatorIncrease()
+                        },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(R.string.calculateIncreases),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 10.dp),
+                            color = textColor
+                        )
+                    }
+
+                Row(
+                    Modifier.padding(top = 20.dp).clickable{
+                        calculatorDecrease
+                    },
+                    verticalAlignment = Alignment.CenterVertically
+                )  {
+                    Text(
+                        text = stringResource(R.string.calculateDecrease),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 10.dp),
+                        color = textColor
+                    )
+                }
+            }
+        }
+        FloatingActionButton(
+            onClick = {
+                onFabClick()
+                if (expandable) {
+                    isExpanded = !isExpanded
+                }
+            },
+            modifier = Modifier
+                .padding(start = 10.dp, bottom = 10.dp)
+                .width(expandedFabWidth)
+                .height(expandedFabHeight),
+            containerColor = basic,
+            shape = RoundedCornerShape(
+                30.dp
+            ),
+            elevation = FloatingActionButtonDefaults.elevation(10.dp)
+
+        ) {
+
+            Icon(
+                imageVector = fabIcon,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(24.dp)
+                    .offset(
+                        x = animateDpAsState(
+                            if (isExpanded) -60.dp else 0.dp,
+                            animationSpec = spring(dampingRatio = 3f)
+                        ).value
+                    ),
+                tint = headers_activeElement
+            )
+
+            Text(
+                text = stringResource(R.string.calculate),
+                softWrap = false,
+                modifier = Modifier
+                    .offset(
+                        x = animateDpAsState(
+                            if (isExpanded) 10.dp else 40.dp,
+                            animationSpec = spring(dampingRatio = 3f)
+                        ).value
+                    )
+                    .alpha(
+                        animateFloatAsState(
+                            targetValue = if (isExpanded) 1f else 0f,
+                            animationSpec = tween(
+                                durationMillis = if (isExpanded) 350 else 100,
+                                delayMillis = if (isExpanded) 100 else 0,
+                                easing = EaseIn
+                            )
+                        ).value
+                    ),
+                color = headers_activeElement
+            )
+
+
+        }
+    }
+}
 @Composable
 fun CustomFloatingActionButton(
     expandable: Boolean,

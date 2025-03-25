@@ -44,12 +44,12 @@ import com.hotelka.knitlyWants.userData
 @Composable
 fun CurrentUserProfileScreen() {
 
-    var usersProjects = remember { mutableStateListOf<Project?>() }
+    var usersProjects = remember { mutableStateListOf<Project>() }
     refUsers.child(userData.value.userId).child(PROJECTS).get().addOnSuccessListener { snapshot ->
         snapshot.children.forEach { project ->
             var id = project.value
             refProjects.child(id.toString()).get().addOnSuccessListener {
-                usersProjects.add(it.getValue(Project::class.java))
+                it.getValue(Project::class.java)?.let { element -> usersProjects.add(element) }
             }
 
         }

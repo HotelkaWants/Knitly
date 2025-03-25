@@ -1,5 +1,6 @@
 package com.hotelka.knitlyWants.FirebaseUtils
 
+import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.database.DataSnapshot
@@ -13,12 +14,14 @@ import com.hotelka.knitlyWants.Data.Likes
 import com.hotelka.knitlyWants.Data.Project
 import com.hotelka.knitlyWants.Data.ProjectsArchive
 import com.hotelka.knitlyWants.Data.UserData
+import com.hotelka.knitlyWants.SupportingDatabase.SupportingDatabase
 import com.hotelka.knitlyWants.blogCurrent
 import com.hotelka.knitlyWants.currentProjectInProgress
 import com.hotelka.knitlyWants.editableProject
 import com.hotelka.knitlyWants.navController
 import com.hotelka.knitlyWants.userData
 import org.apache.commons.lang3.RandomStringUtils
+import kotlin.collections.plus
 
 
 const val CHILD_USERS = "Users"
@@ -34,6 +37,67 @@ class FirebaseDB {
         val refBlogs = ref.child(BLOGS)
         val refProjectsInProgress = ref.child(PROJECTS_IN_PROGRESS)
 
+        fun createSupportingDatabase(context: Context){
+            var blogsIds = listOf<String>()
+            var projectsIds = listOf<String>()
+            var projectsInProgressIds = listOf<String>()
+            var usersIds = listOf<String>()
+
+            val db = SupportingDatabase(context)
+            refUsers.get().addOnSuccessListener{ snapshot ->
+                for (user in snapshot.children){
+                    user.getValue(UserData::class.java)?.let {
+                        db.addUser(it)
+                        usersIds += it.userId
+                    }
+                }
+                db.getAllUsers().forEach { user ->
+                    if (!usersIds.contains(user.userId)){
+                        db.deleteUser(user)
+                    }
+                }
+            }
+            refProjects.get().addOnSuccessListener{ snapshot ->
+                for (project in snapshot.children){
+                    project.getValue(Project::class.java)?.let {
+                        db.addProject(it, it.projectData!!.projectId!!)
+                        projectsIds += it.projectData.projectId
+                    }
+                }
+                db.getAllProjects().forEach { project ->
+                    if (!projectsIds.contains(project.projectData!!.projectId!!)){
+                        db.deleteProject(project)
+                    }
+                }
+            }
+            refBlogs.get().addOnSuccessListener{ snapshot ->
+                for (project in snapshot.children){
+                    project.getValue(Blog::class.java)?.let {
+                        db.addBlog(it, it.projectData!!.projectId!!)
+                        blogsIds += it.projectData!!.projectId!!
+                    }
+                }
+                db.getAllBlog().forEach { blog ->
+                    if (!blogsIds.contains(blog.projectData!!.projectId!!)){
+                        db.deleteBlog(blog)
+                    }
+                }
+            }
+            refProjectsInProgress.child(userData.value.userId).get().addOnSuccessListener{ snapshot ->
+                for (project in snapshot.children){
+                    project.getValue(ProjectsArchive::class.java)?.let {
+                        db.addProjectInProgress(it, it.project?.projectData!!.projectId!!)
+                        projectsInProgressIds += it.project.projectData.projectId
+                    }
+                }
+                db.getAllProjectInProgress().forEach { project ->
+                    if (!projectsIds.contains(project.project!!.projectData!!.projectId!!)){
+                        db.deleteProjectInProgress(project)
+                    }
+                }
+            }
+
+        }
         fun updateProject(project: Project) {
             refProjects.child(project.projectData!!.projectId.toString()).setValue(project)
             refProjectsInProgress.get().addOnSuccessListener { snapshot ->
@@ -157,7 +221,7 @@ class FirebaseDB {
                 }
         }
 
-        fun sendLike(projectId: String, like: Likes): Likes {
+        fun sendLike(projectId: String, like: Likes, onSent: (Boolean, Likes) -> Unit): Likes {
             if (like.users?.contains(userData.value.userId.toString()) == true) {
                 refProjects.child(projectId).child("projectData").child("likes").child("total")
                     .setValue(
@@ -171,6 +235,11 @@ class FirebaseDB {
                             }
                         }
                     }
+                like.apply {
+                    total = total?.minus(1)
+                    users = users?.minus(userData.value.userId)
+                }
+                onSent(false, like)
             } else {
                 refProjects.child(projectId).child("projectData").child("likes").child("total")
                     .setValue(
@@ -184,11 +253,12 @@ class FirebaseDB {
                     total = total?.plus(1)
                     users = users?.plus(userData.value.userId)
                 }
+                onSent(true,like)
             }
             return like
         }
 
-        fun sendLikeBlog(projectId: String, like: Likes): Likes {
+        fun sendLikeBlog(projectId: String, like: Likes, onSent: (Boolean, Likes) -> Unit): Likes {
             if (like.users?.contains(userData.value.userId.toString()) == true) {
                 refBlogs.child(projectId).child("projectData").child("likes").child("total")
                     .setValue(
@@ -206,6 +276,7 @@ class FirebaseDB {
                     total = total?.minus(1)
                     users = users?.minus(userData.value.userId)
                 }
+                onSent(false, like)
             } else {
                 refBlogs.child(projectId).child("projectData").child("likes").child("total")
                     .setValue(
@@ -219,6 +290,7 @@ class FirebaseDB {
                     total = total?.plus(1)
                     users = users?.plus(userData.value.userId)
                 }
+                onSent(true,like)
             }
             return like
         }
@@ -244,9 +316,9 @@ class FirebaseDB {
                     }
                 }
             }
-            refUsers.child(authorID.toString()).child(PROJECTS).get().addOnSuccessListener {
+            refUsers.child(userData.value.userId).child(PROJECTS).get().addOnSuccessListener {
                 for (child in it.children) {
-                    if (child.value == id) {
+                    if (child.value.toString().contains(id.toString())) {
                         child.ref.removeValue()
                     }
                 }
@@ -270,15 +342,6 @@ class FirebaseDB {
             }
             refUsers.child(parsedUser.userId).setValue(parsedUser)
                 .addOnSuccessListener { go() }
-        }
-
-        fun collectUsersRealtime(onDataLoaded: (UserData) -> Unit) {
-            refUsers.get().addOnSuccessListener { snapshot ->
-                for (childSnapshot in snapshot.children) {
-                    val item = childSnapshot.getValue(UserData::class.java)
-                    onDataLoaded(item!!)
-                }
-            }
         }
 
         fun collectCurrentUserProjectsWorks(onDataLoaded: (ProjectsArchive) -> Unit) {
@@ -370,6 +433,7 @@ class FirebaseDB {
                         }
                     }
                 }
+
         }
     }
 }

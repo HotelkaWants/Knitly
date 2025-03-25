@@ -1110,7 +1110,6 @@ fun RegisterScreen(
                         activity,
                         navController
                     )
-
                 }
             },
             modifier = Modifier.fillMaxWidth(),

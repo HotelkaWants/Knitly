@@ -84,7 +84,6 @@ import coil3.compose.AsyncImage
 import com.hotelka.knitlyWants.Data.ProjectsArchive
 import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB
 import com.hotelka.knitlyWants.R
-import com.hotelka.knitlyWants.currentProjectInProgress
 import com.hotelka.knitlyWants.navController
 import com.hotelka.knitlyWants.ui.theme.Shapes
 import com.hotelka.knitlyWants.ui.theme.basic
@@ -114,7 +113,8 @@ fun WorkingOnProject(project: ProjectsArchive = ProjectsArchive()) {
             }
         }
     }
-    var currentDetailRow by remember { mutableStateOf(project.progressDetails!!) }
+    var projectIsDone by remember { mutableStateOf(project.progress == 1f) }
+    var currentDetailRow by remember { mutableStateOf(project.detailRows!!) }
     val details by remember { mutableStateOf(project.project!!.details!!) }
     var counterTitle by remember { mutableStateOf("Row${currentDetailRow.row?.plus(1)}") }
     val listLazyStates = remember { SparseArrayCompat<LazyListState>() }
@@ -141,7 +141,7 @@ fun WorkingOnProject(project: ProjectsArchive = ProjectsArchive()) {
         val project = project.copy(
             progress = getProgress().toFloat(),
             timeInProgress = secondsStopWatch.toString(),
-            progressDetails = currentDetailRow
+            detailRows = currentDetailRow
         )
         FirebaseDB.saveProjectProgress(project, { navController.popBackStack() })
     }
@@ -166,7 +166,7 @@ fun WorkingOnProject(project: ProjectsArchive = ProjectsArchive()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Transparent)
+                    .background(basic)
                     .padding(horizontal = 20.dp),
             ) {
                 IconButton(
@@ -636,33 +636,44 @@ fun WorkingOnProject(project: ProjectsArchive = ProjectsArchive()) {
             Text(counterTitle, color = white)
 
             IconButton(onClick = {
-                coroutineScope.launch {
-                    if (currentDetailRow.row != currentDetailMaxRows) {
-                        currentDetailRow = currentDetailRow.copy(row = currentDetailRow.row!! + 1)
-                        listLazyStates[currentDetailRow.detail!!]?.let { state ->
-                            val itemInfo =
-                                state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == currentDetailRow.row }
-                            itemInfo?.let {
-                                val offset = state.layoutInfo.viewportSize.height / 4
-                                state.animateScrollToItem(currentDetailRow.row!!, -offset)
+                if (projectIsDone){
+                    val project = project.copy(
+                        progress = getProgress().toFloat(),
+                        timeInProgress = secondsStopWatch.toString(),
+                        detailRows = currentDetailRow
+                    )
+                    FirebaseDB.saveProjectProgress(project, { navController.popBackStack() })
+                } else {
+                    coroutineScope.launch {
+                        if (currentDetailRow.row != currentDetailMaxRows) {
+                            currentDetailRow =
+                                currentDetailRow.copy(row = currentDetailRow.row!! + 1)
+                            listLazyStates[currentDetailRow.detail!!]?.let { state ->
+                                val itemInfo =
+                                    state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == currentDetailRow.row }
+                                itemInfo?.let {
+                                    val offset = state.layoutInfo.viewportSize.height / 4
+                                    state.animateScrollToItem(currentDetailRow.row!!, -offset)
+                                }
+
                             }
+                            counterTitle =
+                                if (currentDetailRow.row != currentDetailMaxRows) "Row${currentDetailRow.row!! + 1}"
+                                else context.getString((R.string.detailIsDone))
 
-                        }
-                        counterTitle =
-                            if (currentDetailRow.row != currentDetailMaxRows) "Row${currentDetailRow.row!! + 1}"
-                            else context.getString((R.string.detailIsDone))
-
-                    } else {
-                        if (currentDetailRow.detail != details.size - 1) {
-                            currentDetailRow = currentDetailRow.copy(
-                                row = 0,
-                                detail = currentDetailRow.detail!! + 1
-                            )
-                            currentDetailMaxRows = details[currentDetailRow.detail!!].rows.size
-                            counterTitle = "Row${currentDetailRow.row!! + 1}"
-                            pagerState.animateScrollToPage(currentDetailRow.detail!!)
                         } else {
-                            counterTitle = context.getString(R.string.projectIsDone)
+                            if (currentDetailRow.detail != details.size - 1) {
+                                currentDetailRow = currentDetailRow.copy(
+                                    row = 0,
+                                    detail = currentDetailRow.detail!! + 1
+                                )
+                                currentDetailMaxRows = details[currentDetailRow.detail!!].rows.size
+                                counterTitle = "Row${currentDetailRow.row!! + 1}"
+                                pagerState.animateScrollToPage(currentDetailRow.detail!!)
+                            } else {
+                                counterTitle = context.getString(R.string.projectIsDone)
+                                projectIsDone = true
+                            }
                         }
                     }
                 }

@@ -1,5 +1,6 @@
 package com.hotelka.knitlyWants.Cards
 
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -44,12 +45,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.ValueEventListener
 import com.hotelka.knitlyWants.Data.Project
+import com.hotelka.knitlyWants.Data.ProjectsArchive
 import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB
+import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB.Companion.refProjectsInProgress
 import com.hotelka.knitlyWants.R
+import com.hotelka.knitlyWants.SupportingDatabase.SupportingDatabase
 import com.hotelka.knitlyWants.navController
 import com.hotelka.knitlyWants.projectCurrent
 import com.hotelka.knitlyWants.ui.theme.basic
@@ -59,18 +60,36 @@ import com.hotelka.knitlyWants.ui.theme.white
 import com.hotelka.knitlyWants.userData
 
 @Composable
-fun ProjectContainer(project: Project) {
+fun ProjectContainer(project: Project, exists: Boolean) {
+    Log.d("exist", exists.toString())
     var context = LocalContext.current
-    var started by remember { mutableStateOf(context.getString(R.string.startProject)) }
-    FirebaseDB.refProjectsInProgress.child(userData.value.userId).get().addOnSuccessListener{snapshot ->
-        snapshot.children.forEach{ if (it.key == project.projectData?.projectId) started = context.getString(R.string.started)}
+    var started by remember {mutableStateOf(context.getString(R.string.started))}
+    refProjectsInProgress.child(userData.value.userId).child(project.projectData!!.projectId!!).get().addOnSuccessListener{
+        started = if (it.exists()) context.getString(R.string.started)
+        else context.getString(R.string.startProject)
     }
+    var likes by remember { mutableStateOf(project.projectData.likes) }
+    var likeIcon by remember { mutableStateOf(
+        if (project.projectData.likes.users?.contains(
+                userData.value.userId
+            ) == true
+        ) Icons.Filled.Favorite
+        else Icons.Outlined.FavoriteBorder
+    ) }
+    var likeCount by remember { mutableStateOf(project.projectData.likes.total) }
+    var iconColorFilter by remember { mutableStateOf(
+        if (project.projectData.likes.users?.contains(
+                userData.value.userId
+            ) == true
+        ) ColorFilter.tint(headers_activeElement)
+        else ColorFilter.tint(Color.Gray)
+    ) }
     Card(
         elevation = CardDefaults.cardElevation(10.dp),
         modifier = Modifier
             .wrapContentWidth()
             .clickable {
-                FirebaseDB.sendReview(project.projectData?.projectId!!, project.projectData.reviews)
+                FirebaseDB.sendReview(project.projectData.projectId, project.projectData.reviews)
                 projectCurrent = project
                 navController.navigate("projectOverview")
             }
@@ -102,7 +121,7 @@ fun ProjectContainer(project: Project) {
                             .padding(start = 5.dp, top = 5.dp),
                         color = textColor,
                         fontSize = 15.sp,
-                        text = "${project.projectData?.author}, ${project.projectData?.date}",
+                        text = "${project.projectData.author}, ${project.projectData.date}",
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Bold,
                     )
@@ -111,7 +130,7 @@ fun ProjectContainer(project: Project) {
                             .padding(start = 5.dp),
                         color = textColor,
                         fontSize = 15.sp,
-                        text = project.projectData?.title!!,
+                        text = project.projectData.title!!,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Bold,
                     )
@@ -164,8 +183,15 @@ fun ProjectContainer(project: Project) {
                                     shape = RoundedCornerShape(10.dp)
                                 )
                                 .clickable {
-                                    if (started != context.getString(R.string.started))
-                                        FirebaseDB.startProject(project, { started = context.getString(R.string.started) })
+                                    if (started != context.getString(R.string.started)) {
+                                        FirebaseDB.startProject(
+                                            project
+                                        ) { started = context.getString(R.string.started) }
+                                        SupportingDatabase(context).addProjectInProgress(
+                                            ProjectsArchive(project),
+                                            project.projectData.projectId
+                                        )
+                                    }
                                 }
                                 .padding(10.dp),
                             fontSize = 10.sp,
@@ -183,7 +209,7 @@ fun ProjectContainer(project: Project) {
                             colorFilter = ColorFilter.tint(textColor)
                         )
                         Text(
-                            text = project.projectData!!.reviews.toString(),
+                            text = project.projectData.reviews.toString(),
                             fontSize = 12.sp,
                             modifier = Modifier
                                 .align(Alignment.CenterVertically)
@@ -193,11 +219,7 @@ fun ProjectContainer(project: Project) {
                             fontWeight = FontWeight.Bold,
                         )
                         Image(
-                            imageVector = if (project.projectData.likes.users?.contains(
-                                    userData.value.userId
-                                ) == true
-                            ) Icons.Filled.Favorite
-                            else Icons.Outlined.FavoriteBorder,
+                            imageVector = likeIcon ,
                             contentDescription = "Like",
                             Modifier
                                 .size(25.dp)
@@ -205,17 +227,24 @@ fun ProjectContainer(project: Project) {
                                 .clickable {
                                     FirebaseDB.sendLike(
                                         project.projectData.projectId.toString(),
-                                        project.projectData.likes
-                                    )
+                                        likes
+                                    ) { sent, like ->
+                                        likes = like
+                                        if (sent){
+                                            likeCount = likeCount!! + 1
+                                            likeIcon = Icons.Filled.Favorite
+                                            iconColorFilter = ColorFilter.tint(headers_activeElement)
+                                        } else {
+                                            likeCount = likeCount!! - 1
+                                            likeIcon = Icons.Outlined.FavoriteBorder
+                                            iconColorFilter = ColorFilter.tint(Color.Gray)
+                                        }
+                                    }
                                 },
-                            colorFilter = if (project.projectData.likes.users?.contains(
-                                    userData.value.userId
-                                ) == true
-                            ) ColorFilter.tint(headers_activeElement)
-                            else ColorFilter.tint(Color.Gray)
+                            colorFilter = iconColorFilter
                         )
                         Text(
-                            text = project.projectData.likes.total.toString(),
+                            text = likeCount.toString(),
                             fontSize = 12.sp,
                             modifier = Modifier
                                 .align(Alignment.CenterVertically)
@@ -236,7 +265,7 @@ fun ProjectContainer(project: Project) {
             ) {
 
                 AsyncImage(
-                    model = project.projectData?.cover.toString(),
+                    model = project.projectData.cover.toString(),
                     contentScale = ContentScale.Crop,
                     contentDescription = "Scheme Cover",
                     modifier = Modifier
