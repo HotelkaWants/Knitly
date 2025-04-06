@@ -24,6 +24,7 @@
             android:gravity="center">
 
             <TextView
+                android:id="@+id/username"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Username"
@@ -40,6 +41,7 @@
                 android:textSize="12sp" />
         </LinearLayout>
         <TextView
+            android:id="@+id/message"
             android:textSize="14sp"
             android:layout_marginTop="4dp"
             android:textColor="#6a4e42"

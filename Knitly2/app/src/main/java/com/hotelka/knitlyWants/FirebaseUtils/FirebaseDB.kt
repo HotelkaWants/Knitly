@@ -1,6 +1,7 @@
 package com.hotelka.knitlyWants.FirebaseUtils
 
 import android.content.Context
+import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.database.DataSnapshot
@@ -8,25 +9,42 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import com.google.firebase.messaging.FirebaseMessaging
+import com.google.gson.Gson
 import com.hotelka.knitlyWants.Data.Blog
+import com.hotelka.knitlyWants.Data.Chat
 import com.hotelka.knitlyWants.Data.Comment
 import com.hotelka.knitlyWants.Data.Likes
+import com.hotelka.knitlyWants.Data.Message
+import com.hotelka.knitlyWants.Data.PatternData
 import com.hotelka.knitlyWants.Data.Project
 import com.hotelka.knitlyWants.Data.ProjectsArchive
+import com.hotelka.knitlyWants.Data.Tutorial
 import com.hotelka.knitlyWants.Data.UserData
 import com.hotelka.knitlyWants.SupportingDatabase.SupportingDatabase
 import com.hotelka.knitlyWants.blogCurrent
 import com.hotelka.knitlyWants.currentProjectInProgress
 import com.hotelka.knitlyWants.editableProject
 import com.hotelka.knitlyWants.navController
+import com.hotelka.knitlyWants.read
 import com.hotelka.knitlyWants.userData
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.apache.commons.lang3.RandomStringUtils
+import java.net.URL
+import java.util.UUID
+import kotlin.String
 import kotlin.collections.plus
 
 
 const val CHILD_USERS = "Users"
 const val PROJECTS = "Projects"
 const val BLOGS = "Blogs"
+const val TUTORIALS = "Tutorials"
+const val PATTERNS = "Patterns"
+const val CHATS = "Chats"
 const val PROJECTS_IN_PROGRESS = "ProjectsInProgress"
 
 class FirebaseDB {
@@ -35,69 +53,228 @@ class FirebaseDB {
         val refUsers = ref.child(CHILD_USERS)
         val refProjects = ref.child(PROJECTS)
         val refBlogs = ref.child(BLOGS)
+        val refPatterns = ref.child(PATTERNS)
+        val refChats = ref.child(CHATS)
+        val refTutorials = ref.child(TUTORIALS)
         val refProjectsInProgress = ref.child(PROJECTS_IN_PROGRESS)
 
-        fun createSupportingDatabase(context: Context){
+        fun getTutorials(onDone: (Tutorial) -> Unit){
+            refTutorials.get().addOnSuccessListener{
+                for (tutorial in it.children){
+                    val tutorial = tutorial.getValue(Tutorial::class.java)
+                    tutorial?.let { p1 -> onDone(p1) }
+                }
+            }
+        }
+
+        fun saveTutorial(id: String, tutorial: Tutorial, onDone: () -> Unit){
+            refTutorials.child(id).setValue(tutorial).addOnSuccessListener{
+                onDone()
+            }
+        }
+        fun isOnlineGet(id: String, init: (Boolean) -> Unit) {
+            refUsers.child(id).child("isOnline").addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    snapshot.getValue(Boolean::class.java)?.let { init(it) }
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                }
+
+            })
+        }
+
+        fun sendMessage(message: Message, chatId: String, onDone: () -> Unit) {
+            refChats.child(chatId).child("messages").child(message.id.toString()).setValue(message)
+                .addOnSuccessListener {
+                    onDone()
+                }
+        }
+
+        fun isOnlineSend(isOnline: Boolean, idSupport: String) {
+            refUsers.child(idSupport).child("isOnline").setValue(isOnline)
+        }
+
+        fun chatChecked(id: String, message: Message, onDone: () -> Unit) {
+            if (message.user.userId != userData.value.userId) {
+                refChats.child(id).child("messages").child(message.id.toString()).child("checked")
+                    .setValue(true).addOnSuccessListener {
+                        onDone()
+                    }
+            }
+        }
+
+        fun getIfMessageChecked(chatId: String, messageId: String, onDone: (Boolean) -> Unit) {
+            refChats.child(chatId).child("messages").child(messageId).child("checked")
+                .addListenerForSingleValueEvent(object :
+                    ValueEventListener {
+                    override fun onDataChange(snapshot: DataSnapshot) {
+                        val checked = snapshot.getValue(Boolean::class.java)
+                        checked?.let { onDone(it) }
+                    }
+
+                    override fun onCancelled(error: DatabaseError) {
+
+                    }
+
+                })
+        }
+
+        fun getChat(id: String, onDone: (Chat?) -> Unit) {
+            refChats.child(id.toString()).addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    val chat = snapshot.getValue(Chat::class.java)
+                    onDone(chat)
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                }
+
+            })
+        }
+
+        fun getChats(onDone: (Chat?) -> Unit) {
+            userData.value.chats.forEach { id ->
+                refChats.child(id.toString()).addValueEventListener(object : ValueEventListener {
+                    override fun onDataChange(snapshot: DataSnapshot) {
+                        val chat = snapshot.getValue(Chat::class.java)
+                        onDone(chat)
+                    }
+
+                    override fun onCancelled(error: DatabaseError) {
+                    }
+
+                })
+            }
+        }
+
+        fun getChatMessages(id: String, onDone: (Message) -> Unit) {
+            refChats.child(id.toString()).child("messages")
+                .addValueEventListener(object : ValueEventListener {
+                    override fun onDataChange(snapshot: DataSnapshot) {
+                        snapshot.children.forEach {
+                            val message = it.getValue(Message::class.java)
+                            message?.let { p1 -> onDone(p1) }
+                        }
+                    }
+
+                    override fun onCancelled(error: DatabaseError) {
+                    }
+
+                })
+
+        }
+
+        fun createChat(user: UserData, onDone: (Chat) -> Unit) {
+            val id = UUID.randomUUID().toString()
+            val chat = Chat(
+                id = id,
+                users = listOf(userData.value.userId, user.userId),
+                messages = LinkedHashMap()
+            )
+            refUsers.child(userData.value.userId).child("chats").get()
+                .addOnSuccessListener { snapshot ->
+                    snapshot.child(snapshot.childrenCount.toString()).ref.setValue(id)
+                }
+            refUsers.child(user.userId).child("chats").get().addOnSuccessListener { snapshot ->
+                snapshot.child(snapshot.childrenCount.toString()).ref.setValue(id)
+            }
+            refChats.child(id).setValue(chat).addOnSuccessListener {
+                onDone(chat)
+            }
+        }
+
+        @OptIn(DelicateCoroutinesApi::class)
+        fun getPattern(id: String, authorId: String, onDone: (PatternData) -> Unit) {
+            refPatterns.child(authorId).child(id)
+                .get().addOnSuccessListener { snapshot ->
+                    Log.e("snapshot", id)
+                    runBlocking {
+                        GlobalScope.launch {
+                            try {
+                                var url = URL(snapshot.value.toString())
+                                val pattern = Gson().fromJson(url.read(), PatternData::class.java)
+                                onDone(pattern)
+                            } catch (e: Exception) {
+                            }
+
+                        }
+                    }
+                }
+        }
+
+
+        fun savePattern(fileName: String, onDone: (String) -> Unit) {
+            val id = UUID.randomUUID().toString()
+            refPatterns.child(userData.value.userId).child(id)
+                .setValue(fileName).addOnSuccessListener {
+                    onDone(id)
+                }
+        }
+
+        fun createSupportingDatabase(context: Context) {
             var blogsIds = listOf<String>()
             var projectsIds = listOf<String>()
             var projectsInProgressIds = listOf<String>()
             var usersIds = listOf<String>()
 
             val db = SupportingDatabase(context)
-            refUsers.get().addOnSuccessListener{ snapshot ->
-                for (user in snapshot.children){
+            refUsers.get().addOnSuccessListener { snapshot ->
+                for (user in snapshot.children) {
                     user.getValue(UserData::class.java)?.let {
                         db.addUser(it)
                         usersIds += it.userId
                     }
                 }
                 db.getAllUsers().forEach { user ->
-                    if (!usersIds.contains(user.userId)){
+                    if (!usersIds.contains(user.userId)) {
                         db.deleteUser(user)
                     }
                 }
             }
-            refProjects.get().addOnSuccessListener{ snapshot ->
-                for (project in snapshot.children){
+            refProjects.get().addOnSuccessListener { snapshot ->
+                for (project in snapshot.children) {
                     project.getValue(Project::class.java)?.let {
                         db.addProject(it, it.projectData!!.projectId!!)
                         projectsIds += it.projectData.projectId
                     }
                 }
                 db.getAllProjects().forEach { project ->
-                    if (!projectsIds.contains(project.projectData!!.projectId!!)){
+                    if (!projectsIds.contains(project.projectData!!.projectId!!)) {
                         db.deleteProject(project)
                     }
                 }
             }
-            refBlogs.get().addOnSuccessListener{ snapshot ->
-                for (project in snapshot.children){
+            refBlogs.get().addOnSuccessListener { snapshot ->
+                for (project in snapshot.children) {
                     project.getValue(Blog::class.java)?.let {
                         db.addBlog(it, it.projectData!!.projectId!!)
                         blogsIds += it.projectData!!.projectId!!
                     }
                 }
                 db.getAllBlog().forEach { blog ->
-                    if (!blogsIds.contains(blog.projectData!!.projectId!!)){
+                    if (!blogsIds.contains(blog.projectData!!.projectId!!)) {
                         db.deleteBlog(blog)
                     }
                 }
             }
-            refProjectsInProgress.child(userData.value.userId).get().addOnSuccessListener{ snapshot ->
-                for (project in snapshot.children){
-                    project.getValue(ProjectsArchive::class.java)?.let {
-                        db.addProjectInProgress(it, it.project?.projectData!!.projectId!!)
-                        projectsInProgressIds += it.project.projectData.projectId
+            refProjectsInProgress.child(userData.value.userId).get()
+                .addOnSuccessListener { snapshot ->
+                    for (project in snapshot.children) {
+                        project.getValue(ProjectsArchive::class.java)?.let {
+                            db.addProjectInProgress(it, it.project?.projectData!!.projectId!!)
+                            projectsInProgressIds += it.project.projectData.projectId
+                        }
+                    }
+                    db.getAllProjectInProgress().forEach { project ->
+                        if (!projectsIds.contains(project.project!!.projectData!!.projectId!!)) {
+                            db.deleteProjectInProgress(project)
+                        }
                     }
                 }
-                db.getAllProjectInProgress().forEach { project ->
-                    if (!projectsIds.contains(project.project!!.projectData!!.projectId!!)){
-                        db.deleteProjectInProgress(project)
-                    }
-                }
-            }
 
         }
+
         fun updateProject(project: Project) {
             refProjects.child(project.projectData!!.projectId.toString()).setValue(project)
             refProjectsInProgress.get().addOnSuccessListener { snapshot ->
@@ -175,7 +352,9 @@ class FirebaseDB {
 
                 })
         }
-
+        fun sendCommentReply(comment: Comment, postId: String, id: String, typeDbRef: DatabaseReference) {
+            typeDbRef.child(postId).child("comments").child(id.toString()).child("replies").child(comment.id.toString()).setValue(comment)
+        }
         fun sendComment(comment: Comment, id: String, typeDbRef: DatabaseReference) {
             typeDbRef.child(id).child("comments").child(comment.id.toString()).setValue(comment)
         }
@@ -253,7 +432,7 @@ class FirebaseDB {
                     total = total?.plus(1)
                     users = users?.plus(userData.value.userId)
                 }
-                onSent(true,like)
+                onSent(true, like)
             }
             return like
         }
@@ -290,7 +469,7 @@ class FirebaseDB {
                     total = total?.plus(1)
                     users = users?.plus(userData.value.userId)
                 }
-                onSent(true,like)
+                onSent(true, like)
             }
             return like
         }
@@ -397,7 +576,8 @@ class FirebaseDB {
                 user?.let { p1 -> onLoaded(p1) }
             }
         }
-        fun updateUser(map: MutableMap<String, Any>){
+
+        fun updateUser(map: MutableMap<String, Any>) {
             refUsers.child(userData.value.userId).updateChildren(map)
             navController.popBackStack()
         }
@@ -434,6 +614,27 @@ class FirebaseDB {
                     }
                 }
 
+        }
+
+        fun sendMessage(chatId: String, message: Message) {
+            val currentUser = FirebaseAuth.getInstance().currentUser
+            val data = hashMapOf(
+                "chatId" to message.id,
+                "senderId" to currentUser?.uid,
+                "senderName" to message.user.name + " " + message.user.lastName,
+                "text" to message.text,
+                "timestamp" to message.time,
+                "profilePicture" to message.user.profilePictureUrl
+            )
+        }
+
+        fun sendToken() {
+            FirebaseMessaging.getInstance().token.addOnCompleteListener {
+                if (it.isSuccessful) {
+                    refUsers.child(FirebaseAuth.getInstance().currentUser?.uid.toString())
+                        .child("token").setValue(it.result)
+                }
+            }
         }
     }
 }

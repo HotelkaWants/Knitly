@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -51,6 +52,7 @@ import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB
 import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB.Companion.refProjectsInProgress
 import com.hotelka.knitlyWants.R
 import com.hotelka.knitlyWants.SupportingDatabase.SupportingDatabase
+import com.hotelka.knitlyWants.formatNumber
 import com.hotelka.knitlyWants.navController
 import com.hotelka.knitlyWants.projectCurrent
 import com.hotelka.knitlyWants.ui.theme.basic
@@ -61,7 +63,6 @@ import com.hotelka.knitlyWants.userData
 
 @Composable
 fun ProjectContainer(project: Project, exists: Boolean) {
-    Log.d("exist", exists.toString())
     var context = LocalContext.current
     var started by remember {mutableStateOf(context.getString(R.string.started))}
     refProjectsInProgress.child(userData.value.userId).child(project.projectData!!.projectId!!).get().addOnSuccessListener{
@@ -87,7 +88,7 @@ fun ProjectContainer(project: Project, exists: Boolean) {
     Card(
         elevation = CardDefaults.cardElevation(10.dp),
         modifier = Modifier
-            .wrapContentWidth()
+            .fillMaxWidth()
             .clickable {
                 FirebaseDB.sendReview(project.projectData.projectId, project.projectData.reviews)
                 projectCurrent = project
@@ -103,12 +104,10 @@ fun ProjectContainer(project: Project, exists: Boolean) {
             modifier = Modifier
                 .background(basic)
                 .wrapContentHeight()
-
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .width(190.dp)
             ) {
                 Column(
                     modifier = Modifier
@@ -151,7 +150,7 @@ fun ProjectContainer(project: Project, exists: Boolean) {
                 }
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .wrapContentSize()
                         .background(
                             Brush.verticalGradient(
                                 colorStops = arrayOf(
@@ -165,8 +164,6 @@ fun ProjectContainer(project: Project, exists: Boolean) {
                     modifier = Modifier
                         .fillMaxHeight()
                         .padding(bottom = 5.dp)
-                        .width(180.dp)
-
                 ) {
 
                     Row(
@@ -209,7 +206,7 @@ fun ProjectContainer(project: Project, exists: Boolean) {
                             colorFilter = ColorFilter.tint(textColor)
                         )
                         Text(
-                            text = project.projectData.reviews.toString(),
+                            text = formatNumber(project.projectData.reviews),
                             fontSize = 12.sp,
                             modifier = Modifier
                                 .align(Alignment.CenterVertically)
@@ -244,7 +241,7 @@ fun ProjectContainer(project: Project, exists: Boolean) {
                             colorFilter = iconColorFilter
                         )
                         Text(
-                            text = likeCount.toString(),
+                            text = formatNumber(likeCount!!),
                             fontSize = 12.sp,
                             modifier = Modifier
                                 .align(Alignment.CenterVertically)
@@ -261,7 +258,7 @@ fun ProjectContainer(project: Project, exists: Boolean) {
 
             Box(
                 modifier = Modifier
-                    .width(220.dp)
+                    .fillMaxWidth()
             ) {
 
                 AsyncImage(

@@ -81,6 +81,7 @@ import com.hotelka.knitlyWants.Data.Detail
 import com.hotelka.knitlyWants.Data.DetailRows
 import com.hotelka.knitlyWants.Data.Likes
 import com.hotelka.knitlyWants.Data.Note
+import com.hotelka.knitlyWants.Data.PatternData
 import com.hotelka.knitlyWants.Data.Project
 import com.hotelka.knitlyWants.Data.ProjectData
 import com.hotelka.knitlyWants.Data.RowCrochet
@@ -90,6 +91,7 @@ import com.hotelka.knitlyWants.Supbase.getData
 import com.hotelka.knitlyWants.Supbase.getFileFromUri
 import com.hotelka.knitlyWants.Supbase.uploadFile
 import com.hotelka.knitlyWants.SupportingDatabase.SupportingDatabase
+import com.hotelka.knitlyWants.Tools.distributeDecreases
 import com.hotelka.knitlyWants.Tools.distributeIncreases
 import com.hotelka.knitlyWants.editableBlog
 import com.hotelka.knitlyWants.editableProject
@@ -128,13 +130,13 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
     var title by remember { mutableStateOf(if (currentProject != null) currentProject.projectData!!.title else if (blog_ != null) blog_.projectData!!.title else "") }
 
     var description by remember { mutableStateOf(if (currentProject != null) currentProject.projectData!!.description else if (blog_ != null) blog_.projectData!!.description else "") }
-    var category by remember { mutableStateOf(if (currentProject != null) currentProject.category else Category.Blog) }
+    var category by remember { mutableStateOf(if (currentProject != null) currentProject.category else if(blog_ != null) blog_.category else Category.Knitting) }
     var credits by remember { mutableStateOf(if (currentProject != null) currentProject.credits else if (blog_ != null) blog_.credits else "") }
     var initialImageUri =
         if (currentProject != null) currentProject.projectData?.cover else blog_?.projectData?.cover
 
     var tool by remember {
-        mutableStateOf(
+        mutableDoubleStateOf(
             if (currentProject != null) currentProject.tool!!.replace(
                 "mm",
                 ""
@@ -146,6 +148,7 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
     var expandedSave by remember { mutableStateOf(false) }
     var saveEnabled by remember { mutableStateOf(false) }
     var expandedRows = remember { mutableStateListOf<Boolean>() }
+    var expandedSteps by remember { mutableStateOf(true) }
     var creditsInfoExpanded by remember { mutableStateOf(false) }
 
     var details = remember { mutableStateListOf<Detail>() }
@@ -164,8 +167,22 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
             expandedRows.add(true)
         }
     }
+    var steps = remember { mutableStateListOf<Detail>() }
+    if (currentProject != null) {
+        if (steps.isEmpty()) {
+            steps.addAll(currentProject.details!!)
+        }
+    } else {
+        if (steps.isEmpty()) {
+            steps.add(Detail(rows = mutableListOf(RowCrochet())))
+        }
+    }
+
     var lastDetail by remember { mutableStateOf(details.last()) }
-    var lastRow by remember { mutableStateOf(lastDetail.rows.size) }
+    var lastRow by remember { mutableIntStateOf(lastDetail.rows.size) }
+
+    var lastStep by remember { mutableIntStateOf(steps.last().rows.size) }
+    var pattern: PatternData by remember { mutableStateOf(PatternData()) }
 
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
@@ -176,12 +193,24 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
 
     if (blog_ != null) {
         blog = blog_
-        blogImages.addAll(blog.additionalImages)
+        blogImages.apply {
+            clear()
+            addAll(blog.additionalImages)
+        }
     }
     val imageCropper = rememberImageCropper()
     val composableScope = rememberCoroutineScope()
     var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
     val cropState = imageCropper.cropState
+    var knittingPatternConstructorEnabled by remember { mutableStateOf(false) }
+    var patternId by remember { mutableStateOf<String?>(null) }
+
+    patternId?.let {
+        FirebaseDB.getPattern(it, userData.value.userId) {
+            pattern = it
+        }
+    }
+
     if (cropState != null) ImageCropperDialog(
         state = cropState,
         dialogPadding = PaddingValues(top = 0.dp, start = 0.dp, end = 0.dp, bottom = 80.dp),
@@ -567,7 +596,7 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = if (category == Category.Crocheting) ImageVector.vectorResource(
+                                imageVector = if (category == Crocheting) ImageVector.vectorResource(
                                     R.drawable.hook
                                 )
                                 else ImageVector.vectorResource(R.drawable.kneedles),
@@ -922,12 +951,12 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                                             modifier = Modifier
                                                                 .fillMaxWidth()
                                                                 .wrapContentHeight()
-                                                                .background(basic)
+                                                                .background(textFieldColor)
                                                         ) {
                                                             TextField(
                                                                 modifier = Modifier
                                                                     .padding(horizontal = 20.dp)
-                                                                    .background(basic)
+                                                                    .background(textFieldColor)
                                                                     .fillMaxWidth(),
                                                                 value = row.note!!.text!!,
                                                                 onValueChange = {
@@ -1140,132 +1169,32 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                                         }
                                                     }
                                                 }
-                                                if (openRepeat) {
-                                                    BasicAlertDialog(
-                                                        onDismissRequest = {
-                                                            openRepeat = false
-                                                        }
-                                                    ) {
-                                                        Surface(
-                                                            modifier = Modifier
-                                                                .wrapContentWidth()
-                                                                .wrapContentHeight(),
-                                                            shape = MaterialTheme.shapes.large
-                                                        ) {
-                                                            Column(
-                                                                modifier = Modifier.padding(
-                                                                    16.dp
-                                                                )
-                                                            ) {
-                                                                OutlinedTextField(
-                                                                    value = repeat.toString(),
-                                                                    onValueChange = {
-                                                                        repeat =
-                                                                            if (it.isNotEmpty()) {
-                                                                                it.toInt()
-                                                                            } else {
-                                                                                0
-                                                                            }
-                                                                    },
-                                                                    maxLines = 1,
-                                                                    modifier = Modifier
-                                                                        .padding(10.dp)
-                                                                        .fillMaxWidth(),
-                                                                    isError = (repeat < index + 2),
-                                                                    label = {
-                                                                        if (repeat < index + 2) Text(
-                                                                            stringResource(
-                                                                                R.string.repeatUnitl
-                                                                            ) + "* " + stringResource(
-                                                                                R.string.repeatMustBe
-                                                                            )
-                                                                        )
-                                                                        else Text(
-                                                                            stringResource(
-                                                                                R.string.repeatUnitl
-                                                                            )
-                                                                        )
-                                                                    },
-                                                                    textStyle = LocalTextStyle.current.copy(
-                                                                        fontWeight = FontWeight.Bold,
-                                                                        fontSize = 20.sp,
-                                                                    ),
-                                                                    colors = TextFieldDefaults.colors(
-                                                                        focusedContainerColor = secondary,
-                                                                        unfocusedLabelColor = textColor,
-                                                                        unfocusedPlaceholderColor = textColor,
-                                                                        unfocusedContainerColor = Transparent,
-                                                                        focusedTextColor = textColor,
-                                                                        unfocusedTextColor = textColor
-                                                                    ),
-                                                                    keyboardOptions = KeyboardOptions(
-                                                                        keyboardType = KeyboardType.Number
-                                                                    ),
-                                                                    trailingIcon = {
-                                                                        Row {
-                                                                            AnimatedVisibility(
-                                                                                visible = (repeat < index + 2),
-                                                                                enter = fadeIn() + scaleIn(),
-                                                                                exit = fadeOut() + scaleOut()
-                                                                            ) {
-                                                                                IconButton(
-                                                                                    onClick = {
-                                                                                    },
-                                                                                ) {
-                                                                                    Icon(
-                                                                                        imageVector = Icons.Filled.Info,
-                                                                                        contentDescription = "Error",
-                                                                                        tint = error
-                                                                                    )
-                                                                                }
-                                                                            }
-
-                                                                        }
-                                                                    }
-
-                                                                )
-
-                                                                Button(
-                                                                    modifier = Modifier
-                                                                        .clip(
-                                                                            CircleShape
-                                                                        )
-                                                                        .fillMaxWidth(),
-                                                                    colors = ButtonDefaults.buttonColors(
-                                                                        accent_secondary
-                                                                    ),
-                                                                    onClick = {
-                                                                        openRepeat =
-                                                                            false
-                                                                        if (repeat > index) {
-                                                                            for (i in index + 1..repeat - 1) {
-                                                                                details[indexD] =
-                                                                                    details[indexD].copy(
-                                                                                        rows = details[indexD].rows.toMutableList()
-                                                                                            .apply {
-                                                                                                add(
-                                                                                                    i,
-                                                                                                    row
-                                                                                                )
-                                                                                            })
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                ) {
-                                                                    Text(
-                                                                        stringResource(
-                                                                            R.string.confirm
-                                                                        )
+                                            }
+                                        }
+                                    }
+                                    if (openRepeat) {
+                                        RepeatAlertDialog(
+                                            onDismiss = { openRepeat = false },
+                                            index = index,
+                                        ) {
+                                            openRepeat =
+                                                false
+                                            if (repeat > index) {
+                                                for (i in index + 1..repeat - 1) {
+                                                    details[indexD] =
+                                                        details[indexD].copy(
+                                                            rows = details[indexD].rows.toMutableList()
+                                                                .apply {
+                                                                    add(
+                                                                        i,
+                                                                        row
                                                                     )
-
-                                                                }
-                                                            }
-                                                        }
-                                                    }
+                                                                })
                                                 }
                                             }
                                         }
                                     }
+
                                 }
 
                                 Row(
@@ -1351,7 +1280,522 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                     }
 
                     Category.Knitting -> {
+                        item {
 
+                            Column {
+                                OutlinedTextField(
+                                    value = "",
+                                    readOnly = true,
+                                    onValueChange = {},
+                                    singleLine = true,
+                                    modifier = Modifier
+                                        .background(textFieldColor)
+                                        .padding(10.dp)
+                                        .fillMaxWidth(),
+                                    label = { Text(stringResource(R.string.stepByStep)) },
+                                    textStyle = LocalTextStyle.current.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 20.sp,
+                                    ),
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = secondary,
+                                        unfocusedLabelColor = textColor,
+                                        unfocusedPlaceholderColor = textColor,
+                                        unfocusedContainerColor = white,
+                                        focusedTextColor = textColor,
+                                        unfocusedTextColor = textColor
+                                    ),
+                                    trailingIcon = {
+                                        Row {
+                                            IconButton(
+                                                onClick = {
+                                                    expandedSteps = !expandedSteps
+                                                },
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.ArrowDropDown,
+                                                    contentDescription = null,
+
+                                                    )
+                                            }
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                                steps.forEachIndexed { indexS, step ->
+                                    step.rows.forEachIndexed { index, row ->
+                                        lastStep = index
+                                        var repeat by remember { mutableIntStateOf(index + 2) }
+                                        var expanded by remember { mutableStateOf(false) }
+                                        var openRepeat by remember {
+                                            mutableStateOf(
+                                                false
+                                            )
+                                        }
+                                        var images =
+                                            remember { mutableStateListOf<String?>() }
+                                        row.note?.let {
+                                            it.imageUrl.forEach {
+                                                if (!images.contains(it)) images.add(it)
+                                            }
+                                        }
+                                        val launcher =
+                                            rememberLauncherForActivityResult(contract = ActivityResultContracts.GetContent()) { uri ->
+                                                images.add(uri.toString())
+                                                steps[indexS] = steps[indexS].copy(
+                                                    rows = steps[indexS].rows.toMutableList()
+                                                        .apply {
+                                                            this[index] =
+                                                                this[index].copy(
+                                                                    note = row.note!!.copy(
+                                                                        imageUrl = images
+                                                                    )
+                                                                )
+                                                        })
+                                            }
+
+                                        var stateBox = rememberSwipeToDismissBoxState(
+                                            confirmValueChange = { it ->
+                                                if (it == SwipeToDismissBoxValue.EndToStart) {
+                                                    steps[indexS] =
+                                                        steps[indexS].copy(
+                                                            rows = steps[indexS].rows.toMutableList()
+                                                                .apply {
+                                                                    removeAt(index)
+                                                                })
+                                                }
+
+                                                it != SwipeToDismissBoxValue.EndToStart
+
+                                            }
+                                        )
+
+
+                                        SwipeToDismissBox(
+                                            modifier = Modifier
+                                                .wrapContentSize()
+                                                .animateContentSize(),
+                                            state = stateBox,
+                                            enableDismissFromEndToStart = true,
+                                            enableDismissFromStartToEnd = false,
+                                            backgroundContent = {
+                                                if (expandedSteps) {
+                                                    if (stateBox.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
+                                                        Box(
+                                                            contentAlignment = Alignment.Center,
+                                                            modifier = Modifier
+                                                                .fillMaxSize()
+                                                                .background(error)
+                                                        ) {
+                                                            Icon(
+                                                                modifier = Modifier.minimumInteractiveComponentSize(),
+                                                                imageVector = Icons.Filled.Delete,
+                                                                contentDescription = null,
+                                                                tint = white
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                        ) {
+                                            if (expandedSteps) {
+                                                Box() {
+                                                    Column(
+                                                        modifier = Modifier.background(
+                                                            textFieldColor
+                                                        )
+                                                    ) {
+                                                        TextField(
+                                                            value = row.description!!,
+                                                            onValueChange = {
+                                                                steps[indexS] =
+                                                                    steps[indexS].copy(
+                                                                        rows = steps[indexS].rows.toMutableList()
+                                                                            .apply {
+                                                                                this[index] =
+                                                                                    this[index].copy(
+                                                                                        description = it
+                                                                                    )
+                                                                            })
+                                                            },
+                                                            textStyle = LocalTextStyle.current.copy(
+                                                                fontSize = 15.sp,
+                                                            ),
+                                                            label = {
+                                                                Text("Step${index + 1}")
+                                                            },
+                                                            modifier = Modifier
+                                                                .background(textFieldColor)
+                                                                .padding(
+                                                                    horizontal = 5.dp
+                                                                )
+                                                                .padding(top = 5.dp)
+                                                                .fillMaxWidth()
+                                                                .clip(RoundedCornerShape(20.dp)),
+                                                            colors = TextFieldDefaults.colors(
+                                                                focusedContainerColor = secondary,
+                                                                unfocusedLabelColor = textColor,
+                                                                unfocusedPlaceholderColor = textColor,
+                                                                unfocusedContainerColor = Transparent,
+                                                                focusedTextColor = textColor,
+                                                                unfocusedTextColor = textColor
+                                                            ),
+                                                            trailingIcon = {
+                                                                Row {
+                                                                    IconButton(
+                                                                        onClick = {
+                                                                            expanded =
+                                                                                !expanded
+                                                                            keyboard?.hide()
+                                                                        },
+                                                                    ) {
+                                                                        Icon(
+                                                                            imageVector = Icons.Filled.MoreVert,
+                                                                            contentDescription = "Menu Row",
+                                                                            tint = textColor
+                                                                        )
+
+                                                                    }
+
+                                                                }
+                                                            },
+                                                            keyboardOptions = KeyboardOptions(
+                                                                imeAction = if (index != step.rows.size - 1) ImeAction.Next
+                                                                else ImeAction.Done
+                                                            ),
+                                                            keyboardActions = KeyboardActions(
+                                                                onNext = {
+                                                                    focusManager.moveFocus(
+                                                                        FocusDirection.Down
+                                                                    )
+                                                                },
+                                                                onDone = {
+                                                                    keyboard?.hide()
+                                                                }
+                                                            )
+                                                        )
+                                                        if (row.noteAdded) {
+                                                            Column(
+                                                                modifier = Modifier
+                                                                    .fillMaxWidth()
+                                                                    .wrapContentHeight()
+                                                                    .background(textFieldColor)
+                                                            ) {
+                                                                TextField(
+                                                                    modifier = Modifier
+                                                                        .padding(horizontal = 20.dp)
+                                                                        .background(textFieldColor)
+                                                                        .fillMaxWidth(),
+                                                                    value = row.note!!.text!!,
+                                                                    onValueChange = {
+                                                                        steps[indexS] =
+                                                                            steps[indexS].copy(
+                                                                                rows = steps[indexS].rows.toMutableList()
+                                                                                    .apply {
+                                                                                        this[index] =
+                                                                                            this[index].copy(
+                                                                                                note = row.note!!.copy(
+                                                                                                    text = it
+                                                                                                )
+                                                                                            )
+                                                                                    })
+
+                                                                    },
+                                                                    colors = TextFieldDefaults.colors(
+                                                                        focusedContainerColor = textFieldColor,
+                                                                        unfocusedLabelColor = textColor,
+                                                                        unfocusedPlaceholderColor = textColor,
+                                                                        unfocusedContainerColor = basic,
+                                                                        focusedTextColor = textColor,
+                                                                        unfocusedTextColor = textColor
+                                                                    )
+                                                                )
+
+                                                                LazyRow(
+                                                                    modifier = Modifier
+                                                                        .fillMaxWidth()
+                                                                        .background(textFieldColor)
+                                                                        .heightIn(
+                                                                            0.dp,
+                                                                            200.dp
+                                                                        )
+                                                                ) {
+                                                                    itemsIndexed(row.note!!.imageUrl) { indexI, uri ->
+                                                                        AsyncImage(
+                                                                            model = uri,
+                                                                            modifier = Modifier
+                                                                                .fillMaxSize()
+                                                                                .padding(10.dp)
+                                                                                .clip(
+                                                                                    RoundedCornerShape(
+                                                                                        20.dp
+                                                                                    )
+                                                                                )
+                                                                                .combinedClickable(
+                                                                                    onClick = {},
+                                                                                    onLongClick = {
+                                                                                        images.removeAt(
+                                                                                            indexI
+                                                                                        )
+                                                                                        steps[indexS] =
+                                                                                            steps[indexS].copy(
+                                                                                                rows = steps[indexS].rows.toMutableList()
+                                                                                                    .apply {
+                                                                                                        this[index] =
+                                                                                                            this[index].copy(
+                                                                                                                note = row.note!!.copy(
+                                                                                                                    imageUrl = images
+                                                                                                                )
+                                                                                                            )
+                                                                                                    })
+                                                                                    }
+                                                                                ),
+                                                                            contentScale = ContentScale.FillWidth,
+                                                                            contentDescription = "Note Image"
+                                                                        )
+                                                                    }
+                                                                    item {
+                                                                        AsyncImage(
+                                                                            model = R.drawable.baseline_photo_camera_24,
+                                                                            modifier = Modifier
+                                                                                .wrapContentHeight()
+                                                                                .clip(
+                                                                                    RoundedCornerShape(
+                                                                                        20.dp
+                                                                                    )
+                                                                                )
+                                                                                .clickable {
+                                                                                    launcher.launch(
+                                                                                        "image/*"
+                                                                                    )
+                                                                                },
+                                                                            colorFilter = ColorFilter.tint(
+                                                                                textColor
+                                                                            ),
+                                                                            contentScale = ContentScale.Fit,
+                                                                            contentDescription = "Note Image"
+                                                                        )
+                                                                    }
+
+                                                                }
+                                                            }
+
+                                                        }
+
+                                                    }
+                                                    Row(Modifier.align(Alignment.TopEnd)) {
+                                                        AnimatedVisibility(
+                                                            visible = expanded,
+                                                            enter = fadeIn() + scaleIn(),
+                                                            exit = fadeOut() + scaleOut(),
+                                                        ) {
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .padding(vertical = 10.dp)
+                                                                    .padding(end = 50.dp)
+                                                                    .background(
+                                                                        white,
+                                                                        RoundedCornerShape(
+                                                                            20.dp
+                                                                        )
+                                                                    )
+                                                                    .wrapContentWidth()
+                                                                    .padding(12.dp)
+                                                            ) {
+                                                                Column(
+                                                                    modifier = Modifier
+                                                                        .width(IntrinsicSize.Max)
+                                                                ) {
+
+                                                                    Row(
+                                                                        modifier = Modifier
+                                                                            .fillMaxSize()
+                                                                            .clickable {
+                                                                                expanded =
+                                                                                    false
+                                                                                steps[indexS] =
+                                                                                    steps[indexS].copy(
+                                                                                        rows = steps[indexS].rows.toMutableList()
+                                                                                            .apply {
+                                                                                                this[index] =
+                                                                                                    this[index].copy(
+                                                                                                        noteAdded = !row.noteAdded
+                                                                                                    )
+                                                                                            })
+
+                                                                            },
+                                                                        verticalAlignment = Alignment.CenterVertically
+                                                                    ) {
+                                                                        Icon(
+                                                                            imageVector = ImageVector.vectorResource(
+                                                                                if (row.noteAdded) R.drawable.remove_note
+                                                                                else R.drawable.add_note
+                                                                            ),
+                                                                            contentDescription = "Note",
+                                                                            tint = textColor
+                                                                        )
+
+                                                                        Text(
+                                                                            modifier = Modifier
+                                                                                .wrapContentWidth()
+                                                                                .align(
+                                                                                    Alignment.CenterVertically
+                                                                                )
+                                                                                .padding(
+                                                                                    start = 10.dp
+                                                                                ),
+                                                                            text = stringResource(
+                                                                                if (row.noteAdded) R.string.removeNote
+                                                                                else R.string.addNote
+                                                                            ),
+                                                                            style = MaterialTheme.typography.bodyLarge,
+                                                                            fontWeight = FontWeight.Bold,
+                                                                            color = textColor
+                                                                        )
+
+                                                                    }
+                                                                    Row(
+                                                                        modifier = Modifier
+                                                                            .fillMaxSize()
+                                                                            .padding(top = 12.dp)
+                                                                            .clickable {
+                                                                                expanded =
+                                                                                    false
+                                                                                openRepeat =
+                                                                                    true
+
+                                                                            },
+                                                                        verticalAlignment = Alignment.CenterVertically
+                                                                    ) {
+                                                                        Icon(
+                                                                            imageVector = ImageVector.vectorResource(
+                                                                                R.drawable.baseline_repeat_24
+                                                                            ),
+                                                                            contentDescription = "Repeat",
+                                                                            tint = textColor
+                                                                        )
+
+                                                                        Text(
+                                                                            modifier = Modifier
+                                                                                .wrapContentWidth()
+                                                                                .align(
+                                                                                    Alignment.CenterVertically
+                                                                                )
+                                                                                .padding(
+                                                                                    start = 10.dp
+                                                                                ),
+                                                                            text = stringResource(
+                                                                                R.string.repeatUntilStep
+                                                                            ),
+                                                                            style = MaterialTheme.typography.bodyLarge,
+                                                                            fontWeight = FontWeight.Bold,
+                                                                            color = textColor
+                                                                        )
+
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        if (openRepeat) {
+                                            RepeatAlertDialog(
+                                                onDismiss = { openRepeat = false },
+                                                index = index,
+                                            ) {
+                                                openRepeat =
+                                                    false
+                                                if (repeat > index) {
+                                                    for (i in index + 1..repeat - 1) {
+                                                        steps[indexS] =
+                                                            steps[indexS].copy(
+                                                                rows = steps[indexS].rows.toMutableList()
+                                                                    .apply {
+                                                                        add(
+                                                                            i,
+                                                                            row
+                                                                        )
+                                                                    })
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                    }
+
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(textFieldColor),
+                                        horizontalArrangement = Arrangement.SpaceEvenly
+                                    ) {
+                                        Button(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .padding(4.dp)
+                                                .clip(CircleShape)
+                                                .fillMaxWidth(),
+                                            colors = ButtonDefaults.buttonColors(
+                                                accent_secondary
+                                            ),
+                                            onClick = {
+                                                steps[indexS] = steps[indexS].copy(
+                                                    rows = steps[indexS].rows.toMutableList()
+                                                        .apply {
+                                                            add(
+                                                                RowCrochet(
+                                                                    "",
+                                                                    Note(
+                                                                        "",
+                                                                        mutableListOf()
+                                                                    ),
+                                                                    false,
+                                                                    0
+                                                                )
+                                                            )
+                                                        })
+                                            }
+                                        ) {
+                                            Text(stringResource(R.string.addStep))
+
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        item {
+
+
+                            Column {
+                                Button(
+                                    onClick = { knittingPatternConstructorEnabled = true },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(10.dp),
+                                    shape = RoundedCornerShape(20.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = headers_activeElement,
+                                        contentColor = white
+                                    )
+                                ) {
+                                    Text(
+                                        stringResource(
+                                            if (pattern.gridState.isNotEmpty()) R.string.createNewPattern
+                                            else R.string.createPattern
+                                        )
+                                    )
+                                }
+                                if (pattern.gridState.isNotEmpty()) PatternGrid(
+                                    pattern.columns,
+                                    pattern.gridState.toTypedArray()
+                                ) { }
+
+                            }
+                        }
                     }
 
                     Category.Blog -> {
@@ -1436,162 +1880,161 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
             val now = LocalDateTime.now()
             val formatter = DateTimeFormatter.ofPattern("HH:mm, dd.MM.yyyy ")
             val formatted = now.format(formatter)
-            when (category) {
-                Crocheting -> {
 
-                    composableScope.launch {
-                        val project = Project(
-                            credits = credits,
-                            category = category,
-                            projectData = ProjectData(
-                                likes = if (currentProject != null) currentProject.projectData!!.likes
-                                else Likes(),
-                                reviews = if (currentProject != null) currentProject.projectData!!.reviews
-                                else 0,
-                                projectId = if (currentProject != null) currentProject.projectData!!.projectId
-                                else uniqueUUID,
-                                title = if (title?.get(0) == ' ') title!!.removeRange(
-                                    0,
-                                    0
-                                ) else title!!,
-                                date = if (currentProject != null) currentProject.projectData!!.date
-                                else formatted,
-                                description = description,
-                                author = userData.value.username!!,
-                                authorID = userData.value.userId,
-                                cover = if (imageBitmap != null) getData(
-                                    "projects",
-                                    uploadFile(
-                                        "projects",
-                                        userData.value.username!!,
-                                        imageBitmapToByteArray(imageBitmap!!)
-                                    ).toString()
-                                ) else initialImageUri,
-                            ),
-                            tool = "${tool}mm",
-                            yarns = yarns,
-                            details = details.apply {
-                                this.forEach { detail ->
-                                    detail.rows.forEach { row ->
-                                        if (row.noteAdded) {
-                                            var newNoteList = mutableListOf<String?>()
-                                            Log.d("image", row.note!!.imageUrl.toString())
+            if (category == Category.Blog) {
+                composableScope.launch {
+                    var newImagesList = mutableListOf<String?>()
 
-                                            row.note?.imageUrl?.forEachIndexed { index, string ->
-
-                                                if (string != null && string != "null" && string != "") {
-                                                    var file: File? = null
-                                                    if (!string.contains("cxyqsghvgdqyxrjnvrxn.supabase.co")) {
-                                                        file =
-                                                            getFileFromUri(
-                                                                context,
-                                                                Uri.parse(string)
-                                                            )
-                                                        file?.let {
-                                                            newNoteList.add(
-                                                                getData(
-                                                                    "projects",
-                                                                    uploadFile(
-                                                                        "projects",
-                                                                        userData.value.username!!,
-                                                                        file.readBytes()
-                                                                    ).toString()
-                                                                )
-                                                            )
-                                                        }
-                                                    } else newNoteList.add(string)
-
-                                                }
+                    val blog = Blog(
+                        credits = credits,
+                        category = category,
+                        projectData = ProjectData(
+                            likes = if (blog_ != null) blog_.projectData!!.likes
+                            else Likes(),
+                            reviews = if (blog_ != null) blog_.projectData!!.reviews
+                            else 0,
+                            projectId = if (blog_ != null) blog_.projectData!!.projectId
+                            else uniqueUUID,
+                            title = title!!.trim(),
+                            date = if (blog_ != null) blog_.projectData!!.date
+                            else formatted,
+                            description = description,
+                            author = userData.value.username!!,
+                            authorID = userData.value.userId,
+                            cover = if (imageBitmap != null) getData(
+                                "blogs",
+                                uploadFile(
+                                    "blogs",
+                                    userData.value.username!!,
+                                    imageBitmapToByteArray(imageBitmap!!)
+                                ).toString()
+                            ) else initialImageUri
+                        ),
+                        additionalImages = newImagesList.apply {
+                            blogImages.forEach { string ->
+                                var file: File? = null
+                                string?.contains("cxyqsghvgdqyxrjnvrxn.supabase.co")
+                                    ?.let {
+                                        if (!it) {
+                                            file =
+                                                getFileFromUri(
+                                                    context,
+                                                    Uri.parse(string)
+                                                )
+                                            file?.let {
+                                                newImagesList.add(
+                                                    getData(
+                                                        "projects",
+                                                        uploadFile(
+                                                            "projects",
+                                                            userData.value.username!!,
+                                                            it.readBytes()
+                                                        ).toString()
+                                                    )
+                                                )
                                             }
-                                            row.note?.imageUrl = newNoteList
+                                            blog.additionalImages = blogImages
+                                        } else newImagesList.add(string)
+                                    }
+                            }
+                        }
+                    )
+                    if (blog_ != null) {
+                        FirebaseDB.updateBlog(blog)
+                    } else FirebaseDB.storeBlog(blog, uniqueUUID)
+                    try {
+                        SupportingDatabase(context).deleteBlogDraft(blog)
+                    } catch (_: Exception) {
+                    }
+                    editableBlog = null
 
-                                        } else {
-                                            row.note = null
+                }
+
+            } else {
+                var guide = if (category == Category.Knitting) steps else details
+                composableScope.launch {
+                    val project = Project(
+                        credits = credits,
+                        category = category,
+                        patternId = if (category == Category.Knitting) patternId else "",
+                        projectData = ProjectData(
+                            likes = if (currentProject != null) currentProject.projectData!!.likes
+                            else Likes(),
+                            reviews = if (currentProject != null) currentProject.projectData!!.reviews
+                            else 0,
+                            projectId = if (currentProject != null) currentProject.projectData!!.projectId
+                            else uniqueUUID,
+                            title = if (title?.get(0) == ' ') title!!.removeRange(
+                                0,
+                                0
+                            ) else title!!,
+                            date = if (currentProject != null) currentProject.projectData!!.date
+                            else formatted,
+                            description = description,
+                            author = userData.value.username!!,
+                            authorID = userData.value.userId,
+                            cover = if (imageBitmap != null) getData(
+                                "projects",
+                                uploadFile(
+                                    "projects",
+                                    userData.value.username!!,
+                                    imageBitmapToByteArray(imageBitmap!!)
+                                ).toString()
+                            ) else initialImageUri,
+                        ),
+                        tool = "${tool}mm",
+                        yarns = yarns,
+                        details = guide.apply {
+                            this.forEach { detail ->
+                                detail.rows.forEach { row ->
+                                    if (row.noteAdded) {
+                                        var newNoteList = mutableListOf<String?>()
+                                        Log.d("image", row.note!!.imageUrl.toString())
+
+                                        row.note?.imageUrl?.forEachIndexed { index, string ->
+
+                                            if (string != null && string != "null" && string != "") {
+                                                var file: File? = null
+                                                if (!string.contains("cxyqsghvgdqyxrjnvrxn.supabase.co")) {
+                                                    file =
+                                                        getFileFromUri(
+                                                            context,
+                                                            Uri.parse(string)
+                                                        )
+                                                    file?.let {
+                                                        newNoteList.add(
+                                                            getData(
+                                                                "projects",
+                                                                uploadFile(
+                                                                    "projects",
+                                                                    userData.value.username!!,
+                                                                    file.readBytes()
+                                                                ).toString()
+                                                            )
+                                                        )
+                                                    }
+                                                } else newNoteList.add(string)
+
+                                            }
                                         }
+                                        row.note?.imageUrl = newNoteList
+
+                                    } else {
+                                        row.note = null
                                     }
                                 }
-                            })
-                        if (currentProject != null) {
-                            FirebaseDB.updateProject(project)
-                        } else FirebaseDB.storeProjectCrocheting(project, uniqueUUID)
-                        try {
-                            SupportingDatabase(context).deleteDraft(project)
-                        } catch (e: Exception) {
-                        }
-                        editableProject = null
-                    }
-                }
-
-                Category.Blog -> {
-                    composableScope.launch {
-                        var newImagesList = mutableListOf<String?>()
-
-                        val blog = Blog(
-                            credits = credits,
-                            category = category,
-                            projectData = ProjectData(
-                                likes = if (blog_ != null) blog_.projectData!!.likes
-                                else Likes(),
-                                reviews = if (blog_ != null) blog_.projectData!!.reviews
-                                else 0,
-                                projectId = if (blog_ != null) blog_.projectData!!.projectId
-                                else uniqueUUID,
-                                title = title!!.trim(),
-                                date = if (blog_ != null) blog_.projectData!!.date
-                                else formatted,
-                                description = description,
-                                author = userData.value.username!!,
-                                authorID = userData.value.userId,
-                                cover = if (imageBitmap != null && (initialImageUri?.contains("supabase") == false)) getData(
-                                    "blogs",
-                                    uploadFile(
-                                        "blogs",
-                                        userData.value.username!!,
-                                        imageBitmapToByteArray(imageBitmap!!)
-                                    ).toString()
-                                ) else initialImageUri
-                            ),
-                            additionalImages = newImagesList.apply {
-                                blogImages.forEach { string ->
-                                    var file: File? = null
-                                    string?.contains("cxyqsghvgdqyxrjnvrxn.supabase.co")
-                                        ?.let {
-                                            if (!it) {
-                                                file =
-                                                    getFileFromUri(
-                                                        context,
-                                                        Uri.parse(string)
-                                                    )
-                                                file?.let {
-                                                    newImagesList.add(
-                                                        getData(
-                                                            "projects",
-                                                            uploadFile(
-                                                                "projects",
-                                                                userData.value.username!!,
-                                                                it.readBytes()
-                                                            ).toString()
-                                                        )
-                                                    )
-                                                }
-                                                blog.additionalImages = blogImages
-                                            } else newImagesList.add(string)
-                                        }
-                                }
                             }
-                        )
-                        if (blog_ != null) {
-                            FirebaseDB.updateBlog(blog)
-                        } else FirebaseDB.storeBlog(blog, uniqueUUID)
-                        try {
-                            SupportingDatabase(context).deleteBlogDraft(blog)
-                        } catch (e: Exception) {
-                        }
-                        editableBlog = null
-
+                        })
+                    if (currentProject != null) {
+                        FirebaseDB.updateProject(project)
+                    } else FirebaseDB.storeProjectCrocheting(project, uniqueUUID)
+                    try {
+                        SupportingDatabase(context).deleteDraft(project)
+                    } catch (_: Exception) {
                     }
-
+                    editableProject = null
                 }
+
             }
 
         }
@@ -1783,7 +2226,7 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
         if (category != Category.Blog) {
             Box(
                 Modifier
-                    .padding(bottom = 70.dp)
+                    .padding(bottom = 60.dp)
                     .animateContentSize()
                     .align(Alignment.BottomEnd)
                     .padding(20.dp)
@@ -1795,11 +2238,11 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                     },
                     calculatorDecrease = {
                         calculator = true
-                        calculateValue = "Increases"
+                        calculateValue = "Decreases"
                     },
                     calculatorIncrease = {
                         calculator = true
-                        calculateValue = "Decreases"
+                        calculateValue = "Increases"
                     },
                     fabIcon = ImageVector.vectorResource(R.drawable.calculator),
                 )
@@ -1827,7 +2270,7 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                             true
                         }
                     when (category) {
-                        Category.Crocheting -> {
+                        Crocheting -> {
                             details.forEach { detail ->
                                 if (detail.title!!.isEmpty()) {
                                     Toast.makeText(
@@ -1881,9 +2324,127 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
             }
         }
         AnimatedVisibility(visible = loadingEnabled) { LoadingAnimation(circleSize = 50.dp) }
+        if (knittingPatternConstructorEnabled) KnittingPatternConstructor {
+            knittingPatternConstructorEnabled = false; patternId = it
+        }
 
     }
 
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RepeatAlertDialog(onDismiss: () -> Unit, index: Int, onConfirm: () -> Unit) {
+    var repeat by remember { mutableIntStateOf(index + 2) }
+
+    BasicAlertDialog(
+        onDismissRequest = {
+            onDismiss()
+        }
+    ) {
+        Surface(
+            modifier = Modifier
+                .wrapContentWidth()
+                .wrapContentHeight(),
+            shape = MaterialTheme.shapes.large
+        ) {
+            Column(
+                modifier = Modifier.padding(
+                    16.dp
+                )
+            ) {
+                OutlinedTextField(
+                    value = repeat.toString(),
+                    onValueChange = {
+                        repeat =
+                            if (it.isNotEmpty()) {
+                                it.toInt()
+                            } else {
+                                0
+                            }
+                    },
+                    maxLines = 1,
+                    modifier = Modifier
+                        .padding(10.dp)
+                        .fillMaxWidth(),
+                    isError = (repeat < index + 2),
+                    label = {
+                        if (repeat < index + 2) Text(
+                            stringResource(
+                                R.string.repeatUnitl
+                            ) + "* " + stringResource(
+                                R.string.repeatMustBe
+                            )
+                        )
+                        else Text(
+                            stringResource(
+                                R.string.repeatUnitl
+                            )
+                        )
+                    },
+                    textStyle = LocalTextStyle.current.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                    ),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = secondary,
+                        unfocusedLabelColor = textColor,
+                        unfocusedPlaceholderColor = textColor,
+                        unfocusedContainerColor = Transparent,
+                        focusedTextColor = textColor,
+                        unfocusedTextColor = textColor
+                    ),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number
+                    ),
+                    trailingIcon = {
+                        Row {
+                            AnimatedVisibility(
+                                visible = (repeat < index + 2),
+                                enter = fadeIn() + scaleIn(),
+                                exit = fadeOut() + scaleOut()
+                            ) {
+                                IconButton(
+                                    onClick = {
+                                    },
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Info,
+                                        contentDescription = "Error",
+                                        tint = error
+                                    )
+                                }
+                            }
+
+                        }
+                    }
+
+                )
+
+                Button(
+                    modifier = Modifier
+                        .clip(
+                            CircleShape
+                        )
+                        .fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        accent_secondary
+                    ),
+                    onClick = {
+                        onConfirm()
+                    }
+                ) {
+                    Text(
+                        stringResource(
+                            R.string.confirm
+                        )
+                    )
+
+                }
+            }
+        }
+
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1924,153 +2485,33 @@ fun Calculator(
             )
             var selectedOptionText by remember { mutableStateOf(options[0]) }
 
-            Column(
+            LazyColumn(
                 modifier = Modifier
                     .padding(16.dp)
                     .animateContentSize()
             ) {
-                Text(
-                    text = stringResource(R.string.calculate) + " $calculateValue",
-                    modifier = Modifier
-                        .padding(10.dp)
-                        .fillMaxWidth(),
-                    fontSize = 18.sp,
-                    color = textColor
-
-                )
-
-                OutlinedTextField(
-                    modifier = Modifier
-                        .padding(8.dp),
-                    value = stitchesAmount.toString(),
-                    onValueChange = { it ->
-                        if (it.toIntOrNull() != null) {
-                            stitchesAmount = it.toInt()
-                        }
-                        errorStitches = stitchesAmount <= 0
-                    },
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = textFieldColor,
-                        unfocusedContainerColor = textFieldColor,
-                        focusedTextColor = textColor,
-                        unfocusedTextColor = textColor,
-                        focusedLabelColor = textColor,
-                        unfocusedLabelColor = textColor,
-                        errorContainerColor = error
-                    ),
-                    keyboardOptions = KeyboardOptions.Default.copy(
-                        keyboardType = KeyboardType.Number
-                    ),
-                    isError = errorStitches,
-                    label = {
-                        Text(
-                            if (errorStitches) stringResource(R.string.currentStitchesAmount) + "* ${
-                                context.getString(
-                                    R.string.lessThanZero
-                                )
-                            }"
-                            else stringResource(R.string.currentStitchesAmount)
-                        )
-                    }
-
-                )
-
-                OutlinedTextField(
-                    modifier = Modifier
-                        .padding(8.dp),
-                    value = valuesCalculate.toString(),
-                    onValueChange = { it ->
-                        if (it.toIntOrNull() != null) {
-                            valuesCalculate = it.toInt()
-                        }
-                        valuesError = valuesCalculate > stitchesAmount
-
-                    },
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = textFieldColor,
-                        unfocusedContainerColor = textFieldColor,
-                        focusedTextColor = textColor,
-                        unfocusedTextColor = textColor,
-                        focusedLabelColor = textColor,
-                        unfocusedLabelColor = textColor,
-                        errorContainerColor = error
-                    ),
-                    keyboardOptions = KeyboardOptions.Default.copy(
-                        keyboardType = KeyboardType.Number
-                    ),
-                    isError = valuesError,
-                    label = {
-                        Text(
-                            if (valuesError) stringResource(R.string.calculate) + " $calculateValue* " +
-                                    "${stringResource(R.string.mustBeLess)} $stitchesAmount"
-                            else stringResource(R.string.calculate) + " $calculateValue"
-                        )
-                    }
-
-                )
-                Row(Modifier.padding(vertical = 8.dp, horizontal = 10.dp)) {
-                    OutlinedTextField(
+                item {
+                    Text(
+                        text = stringResource(R.string.calculate) + " $calculateValue",
                         modifier = Modifier
-                            .wrapContentWidth()
-                            .weight(1f)
-                            .padding(end = 8.dp),
-                        value = detailInput.toString(),
-                        onValueChange = { it ->
-                            detailInput = it
-                            if (details.isEmpty()) {
-                                detailError = true
-                            } else {
-                                for (it in details) {
-                                    detailError = true
-                                    if (it.title?.replace(" ", "") == detailInput?.replace(
-                                            " ",
-                                            ""
-                                        )
-                                    ) {
-                                        detailError = false
-                                        detail = it
-                                        break
-                                    }
-                                }
-                            }
-                        },
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = textFieldColor,
-                            unfocusedContainerColor = textFieldColor,
-                            focusedTextColor = textColor,
-                            unfocusedTextColor = textColor,
-                            focusedLabelColor = textColor,
-                            unfocusedLabelColor = textColor,
-                            errorContainerColor = error
-                        ),
-                        isError = detailError,
-                        label = {
-                            Text(
-                                if (detailError) stringResource(R.string.detail) + " ${
-                                    stringResource(
-                                        R.string.noSuchDetail
-                                    )
-                                }* "
-                                else stringResource(R.string.detail)
-                            )
-                        }
+                            .padding(10.dp)
+                            .fillMaxWidth(),
+                        fontSize = 18.sp,
+                        color = textColor
+
                     )
+                }
+
+                item {
                     OutlinedTextField(
                         modifier = Modifier
-                            .wrapContentWidth()
-                            .weight(1f),
-                        value = applyOnRow.toString(),
+                            .padding(8.dp),
+                        value = stitchesAmount.toString(),
                         onValueChange = { it ->
                             if (it.toIntOrNull() != null) {
-                                applyOnRow = it.toInt()
+                                stitchesAmount = it.toInt()
                             }
-                            rowError = if (applyOnRow > detail.rows.size) {
-                                true
-                            } else if (applyOnRow <= 0) {
-                                true
-                            } else {
-                                false
-                            }
+                            errorStitches = stitchesAmount <= 0
                         },
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = textFieldColor,
@@ -2081,149 +2522,293 @@ fun Calculator(
                             unfocusedLabelColor = textColor,
                             errorContainerColor = error
                         ),
-                        isError = rowError,
-                        label = {
-                            Text(
-                                if (rowError) "Row* ${stringResource(R.string.noSuchRow)}* "
-                                else "Row"
-                            )
-                        },
                         keyboardOptions = KeyboardOptions.Default.copy(
                             keyboardType = KeyboardType.Number
                         ),
+                        isError = errorStitches,
+                        label = {
+                            Text(
+                                if (errorStitches) stringResource(R.string.currentStitchesAmount) + "* ${
+                                    context.getString(
+                                        R.string.lessThanZero
+                                    )
+                                }"
+                                else stringResource(R.string.currentStitchesAmount)
+                            )
+                        }
+
+                    )
+                }
+
+                item {
+                    OutlinedTextField(
+                        modifier = Modifier
+                            .padding(8.dp),
+                        value = valuesCalculate.toString(),
+                        onValueChange = { it ->
+                            if (it.toIntOrNull() != null) {
+                                valuesCalculate = it.toInt()
+                            }
+                            valuesError = valuesCalculate > stitchesAmount
+
+                        },
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = textFieldColor,
+                            unfocusedContainerColor = textFieldColor,
+                            focusedTextColor = textColor,
+                            unfocusedTextColor = textColor,
+                            focusedLabelColor = textColor,
+                            unfocusedLabelColor = textColor,
+                            errorContainerColor = error
+                        ),
+                        keyboardOptions = KeyboardOptions.Default.copy(
+                            keyboardType = KeyboardType.Number
+                        ),
+                        isError = valuesError,
+                        label = {
+                            Text(
+                                if (valuesError) stringResource(R.string.calculate) + " $calculateValue* " +
+                                        "${stringResource(R.string.mustBeLess)} $stitchesAmount"
+                                else stringResource(R.string.calculate) + " $calculateValue"
+                            )
+                        }
+
+                    )
+                }
+                item {
+                    Row(Modifier.padding(vertical = 8.dp, horizontal = 10.dp)) {
+                        OutlinedTextField(
+                            modifier = Modifier
+                                .wrapContentWidth()
+                                .weight(1f)
+                                .padding(end = 8.dp),
+                            value = detailInput.toString(),
+                            onValueChange = { it ->
+                                detailInput = it
+                                if (details.isEmpty()) {
+                                    detailError = true
+                                } else {
+                                    for (it in details) {
+                                        detailError = true
+                                        if (it.title?.replace(" ", "") == detailInput?.replace(
+                                                " ",
+                                                ""
+                                            )
+                                        ) {
+                                            detailError = false
+                                            detail = it
+                                            break
+                                        }
+                                    }
+                                }
+                            },
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = textFieldColor,
+                                unfocusedContainerColor = textFieldColor,
+                                focusedTextColor = textColor,
+                                unfocusedTextColor = textColor,
+                                focusedLabelColor = textColor,
+                                unfocusedLabelColor = textColor,
+                                errorContainerColor = error
+                            ),
+                            isError = detailError,
+                            label = {
+                                Text(
+                                    if (detailError) stringResource(R.string.detail) + " ${
+                                        stringResource(
+                                            R.string.noSuchDetail
+                                        )
+                                    }* "
+                                    else stringResource(R.string.detail)
+                                )
+                            }
+                        )
+
+                        OutlinedTextField(
+                            modifier = Modifier
+                                .wrapContentWidth()
+                                .weight(1f),
+                            value = applyOnRow.toString(),
+                            onValueChange = { it ->
+                                if (it.toIntOrNull() != null) {
+                                    applyOnRow = it.toInt()
+                                }
+                                rowError = if (applyOnRow > detail.rows.size) {
+                                    true
+                                } else if (applyOnRow <= 0) {
+                                    true
+                                } else {
+                                    false
+                                }
+                            },
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = textFieldColor,
+                                unfocusedContainerColor = textFieldColor,
+                                focusedTextColor = textColor,
+                                unfocusedTextColor = textColor,
+                                focusedLabelColor = textColor,
+                                unfocusedLabelColor = textColor,
+                                errorContainerColor = error
+                            ),
+                            isError = rowError,
+                            label = {
+                                Text(
+                                    if (rowError) "Row* ${stringResource(R.string.noSuchRow)}* "
+                                    else "Row"
+                                )
+                            },
+                            keyboardOptions = KeyboardOptions.Default.copy(
+                                keyboardType = KeyboardType.Number
+                            ),
+
+                            )
+                    }
+                }
+                item {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+
+                        Text(
+                            options[0],
+                            fontWeight = FontWeight.Medium,
+                            color = if (selectedOptionText == options[0]) white
+                            else textColor,
+                            modifier = Modifier
+                                .padding(8.dp)
+                                .clip(Shapes.small)
+                                .background(
+                                    if (selectedOptionText == options[0]) accent_secondary
+                                    else secondary
+                                )
+                                .clickable {
+                                    selectedOptionText = options[0]
+                                }
+                                .padding(vertical = 6.dp, horizontal = 14.dp)
 
                         )
-                }
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
+                        Text(
+                            options[1],
+                            fontWeight = FontWeight.Medium,
+                            color = if (selectedOptionText == options[1]) white
+                            else textColor,
+                            modifier = Modifier
+                                .padding(8.dp)
+                                .clip(Shapes.small)
+                                .background(
+                                    if (selectedOptionText == options[1]) accent_secondary
+                                    else secondary
+                                )
+                                .clickable {
+                                    selectedOptionText = options[1]
+                                }
+                                .padding(vertical = 6.dp, horizontal = 14.dp)
 
-                    Text(
-                        options[0],
-                        fontWeight = FontWeight.Medium,
-                        color = if (selectedOptionText == options[0]) white
-                        else textColor,
-                        modifier = Modifier
-                            .padding(8.dp)
-                            .clip(Shapes.small)
-                            .background(
-                                if (selectedOptionText == options[0]) accent_secondary
-                                else secondary
-                            )
-                            .clickable {
-                                selectedOptionText = options[0]
-                            }
-                            .padding(vertical = 6.dp, horizontal = 14.dp)
+                        )
+                        Text(
+                            options[2],
+                            fontWeight = FontWeight.Medium,
+                            color = if (selectedOptionText == options[2]) white
+                            else textColor,
+                            modifier = Modifier
+                                .padding(8.dp)
+                                .clip(Shapes.small)
+                                .background(
+                                    if (selectedOptionText == options[2]) accent_secondary
+                                    else secondary
+                                )
+                                .clickable {
+                                    selectedOptionText = options[2]
+                                }
+                                .padding(vertical = 6.dp, horizontal = 14.dp)
+                        )
 
-                    )
-                    Text(
-                        options[1],
-                        fontWeight = FontWeight.Medium,
-                        color = if (selectedOptionText == options[1]) white
-                        else textColor,
-                        modifier = Modifier
-                            .padding(8.dp)
-                            .clip(Shapes.small)
-                            .background(
-                                if (selectedOptionText == options[1]) accent_secondary
-                                else secondary
-                            )
-                            .clickable {
-                                selectedOptionText = options[1]
-                            }
-                            .padding(vertical = 6.dp, horizontal = 14.dp)
-
-                    )
-                    Text(
-                        options[2],
-                        fontWeight = FontWeight.Medium,
-                        color = if (selectedOptionText == options[2]) white
-                        else textColor,
-                        modifier = Modifier
-                            .padding(8.dp)
-                            .clip(Shapes.small)
-                            .background(
-                                if (selectedOptionText == options[2]) accent_secondary
-                                else secondary
-                            )
-                            .clickable {
-                                selectedOptionText = options[2]
-                            }
-                            .padding(vertical = 6.dp, horizontal = 14.dp)
-                    )
-
-                }
-                Button(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = headers_activeElement),
-                    onClick = {
-                        if (!errorStitches && !valuesError) {
-                            result = distributeIncreases(
-                                context, stitchesAmount, valuesCalculate, selectedOptionText
-                            )
-                        }
                     }
-                ) {
-                    Text(stringResource(R.string.calculate))
-
                 }
-
-                Text(
-                    text = result,
-                    modifier = Modifier
-                        .padding(horizontal = 10.dp)
-                        .padding(bottom = 5.dp)
-                        .fillMaxWidth()
-                        .wrapContentHeight(),
-                    fontSize = 16.sp,
-                    color = textColor
-
-                )
-
-                Row(
-                    Modifier.wrapContentSize(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
+                item {
                     Button(
                         modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 8.dp),
+                            .fillMaxWidth()
+                            .padding(8.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = headers_activeElement),
                         onClick = {
-                            onCancel()
-                        }
-                    ) {
-                        Text(stringResource(R.string.cancel))
-
-                    }
-                    Button(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(start = 8.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor =
-                            if (!errorStitches && !valuesError && !detailError && !rowError && result != context.getString(
-                                    R.string.result
-                                )
-                            ) {
-                                headers_activeElement
-                            } else Gray
-                        ),
-                        onClick = {
-                            if (!errorStitches && !valuesError && !detailError && !rowError && result != context.getString(
-                                    R.string.result
-                                )
-                            ) {
-                                apply(DetailRows(details.indexOf(detail), applyOnRow - 1), result)
-                                onCancel()
+                            if (!errorStitches && !valuesError) {
+                                result = if (calculateValue == "Increases") {
+                                    distributeIncreases(
+                                    context, stitchesAmount, valuesCalculate, selectedOptionText
+                                )} else {
+                                    distributeDecreases(
+                                        context, stitchesAmount, valuesCalculate, selectedOptionText
+                                    )
+                                }
                             }
                         }
                     ) {
-                        Text(stringResource(R.string.apply))
+                        Text(stringResource(R.string.calculate))
 
+                    }
+                }
+                item {
+                    Text(
+                        text = result,
+                        modifier = Modifier
+                            .padding(horizontal = 10.dp)
+                            .padding(bottom = 5.dp)
+                            .fillMaxWidth()
+                            .wrapContentHeight(),
+                        fontSize = 16.sp,
+                        color = textColor
+
+                    )
+                }
+
+                item {
+                    Row(
+                        Modifier.wrapContentSize(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        Button(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = headers_activeElement),
+                            onClick = {
+                                onCancel()
+                            }
+                        ) {
+                            Text(stringResource(R.string.cancel))
+
+                        }
+                        Button(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(start = 8.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor =
+                                if (!errorStitches && !valuesError && !detailError && !rowError && result != context.getString(
+                                        R.string.result
+                                    )
+                                ) {
+                                    headers_activeElement
+                                } else Gray
+                            ),
+                            onClick = {
+                                if (!errorStitches && !valuesError && !detailError && !rowError && result != context.getString(
+                                        R.string.result
+                                    )
+                                ) {
+                                    apply(
+                                        DetailRows(details.indexOf(detail), applyOnRow - 1),
+                                        result
+                                    )
+                                    onCancel()
+                                }
+                            }
+                        ) {
+                            Text(stringResource(R.string.apply))
+
+                        }
                     }
                 }
             }

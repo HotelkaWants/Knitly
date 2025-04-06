@@ -55,6 +55,7 @@ import com.hotelka.knitlyWants.Data.Project
 import com.hotelka.knitlyWants.Data.UserData
 import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB
 import com.hotelka.knitlyWants.R
+import com.hotelka.knitlyWants.formatNumber
 import com.hotelka.knitlyWants.navController
 import com.hotelka.knitlyWants.projectCurrent
 import com.hotelka.knitlyWants.ui.theme.headers_activeElement
@@ -99,7 +100,7 @@ fun ExpandedProjectCard(project: Project, author: UserData) {
                     modifier = Modifier
                         .height(250.dp)
                         .width(250.dp),
-                    painter = rememberAsyncImagePainter(project?.projectData!!.cover),
+                    painter = rememberAsyncImagePainter(project.projectData!!.cover),
                     contentScale = ContentScale.Crop,
                     contentDescription = "Scheme Cover"
                 )
@@ -135,7 +136,7 @@ fun ExpandedProjectCard(project: Project, author: UserData) {
                             colorFilter = ColorFilter.tint(textColor)
                         )
                         Text(
-                            text = project.projectData.reviews.toString(),
+                            text = formatNumber(project.projectData.reviews),
                             fontSize = 12.sp,
                             modifier = Modifier
                                 .align(Alignment.CenterVertically)
@@ -173,7 +174,7 @@ fun ExpandedProjectCard(project: Project, author: UserData) {
                             colorFilter = iconColorFilter
                         )
                         Text(
-                            text = likeCount.toString(),
+                            text = formatNumber(likeCount!!),
                             fontSize = 12.sp,
                             modifier = Modifier
                                 .align(Alignment.CenterVertically)

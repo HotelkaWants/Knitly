@@ -120,5 +120,25 @@
     <string name="center">Center</string>
     <string name="price">Price</string>
     <string name="priceInfo">By specifying the price, you confirm that the finished product is available for sale</string>
+    <string name="generatePattern">Generate Pattern</string>
+    <string name="rows">Rows</string>
+    <string name="loopsNumber">Loops on kneedle</string>
+    <string name="savePattern">Save Pattern</string>
+    <string name="stepByStep">Step by step guide</string>
+    <string name="createPattern">Create Pattern</string>
+    <string name="repeatUntilStep">Repeat Until Step</string>
+    <string name="addStep">Add Step</string>
+    <string name="createNewPattern">Create New Pattern</string>
+    <string name="step">Step</string>
+    <string name="optional">Optional</string>
+    <string name="sendMessage">Send Message</string>
+    <string name="chats">Chats</string>
+    <string name="notifications">Notifications</string>
+    <string name="sayHi">Say Hi!</string>
+    <string name="you">"You: "</string>
+    <string name="dec">dec</string>
+    <string name="default_notification_channel_id">222333</string>
+    <string name="outline">Outline</string>
+    <string name="addCover">Add Cover</string>
 
 </resources>

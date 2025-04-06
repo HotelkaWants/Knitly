@@ -92,7 +92,7 @@ fun CustomFabTools(
 
                 Row(
                     Modifier.padding(top = 20.dp).clickable{
-                        calculatorDecrease
+                        calculatorDecrease()
                     },
                     verticalAlignment = Alignment.CenterVertically
                 )  {

@@ -24,7 +24,7 @@ class SupportingDatabase(context: Context) :
 
     companion object {
         private const val DATABASE_NAME = "KnitlySupportDB"
-        private const val DATABASE_VERSION = 10
+        private const val DATABASE_VERSION = 11
 
         private const val TABLE_PROJECTS_IN_PROGRESS = "ProjectsInProgress"
         private const val KEY_PROJECT = "project"
@@ -40,6 +40,7 @@ class SupportingDatabase(context: Context) :
         private const val KEY_CATEGORY = "category"
         private const val KEY_COMMENTS = "comments"
         private const val KEY_CREDITS = "credits"
+        private const val KEY_PATTERN_ID = "patternId"
         private const val KEY_TOOL = "tool"
         private const val KEY_YARNS = "yarns"
 
@@ -98,7 +99,8 @@ class SupportingDatabase(context: Context) :
                 + "$KEY_YARNS TEXT,"
                 + "$KEY_CATEGORY TEXT,"
                 + "$KEY_COMMENTS TEXT,"
-                + "$KEY_CREDITS TEXT)")
+                + "$KEY_CREDITS TEXT,"
+                + "$KEY_PATTERN_ID TEXT)")
 
         val CREATE_BLOGS_TABLE = ("CREATE TABLE $TABLE_BLOGS ("
                 + "$KEY_PROJECT_ID TEXT PRIMARY KEY,"
@@ -122,7 +124,8 @@ class SupportingDatabase(context: Context) :
                 + "$KEY_TOOL TEXT,"
                 + "$KEY_YARNS TEXT,"
                 + "$KEY_CATEGORY TEXT,"
-                + "$KEY_CREDITS TEXT)")
+                + "$KEY_CREDITS TEXT,"
+                + "$KEY_PATTERN_ID TEXT)")
 
 
         val CREATE_HISTORY_TABLE = ("CREATE TABLE $TABLE_HISTORY ("
@@ -655,6 +658,7 @@ class SupportingDatabase(context: Context) :
             put(KEY_YARNS, project.yarns)
             put(KEY_CATEGORY, project.category)
             put(KEY_CREDITS, project.credits)
+            put(KEY_PATTERN_ID, project.patternId)
 
         }
         return db.insertWithOnConflict(TABLE_PROJECTS_DRAFT, null, values, SQLiteDatabase.CONFLICT_REPLACE)
@@ -664,7 +668,7 @@ class SupportingDatabase(context: Context) :
         val db = this.readableDatabase
         val cursor = db.query(
             TABLE_PROJECTS_DRAFT,
-            arrayOf(KEY_DETAILS, KEY_PROJECT_DATA, KEY_TOOL, KEY_YARNS, KEY_CATEGORY, KEY_CREDITS),
+            arrayOf(KEY_DETAILS, KEY_PROJECT_DATA, KEY_TOOL, KEY_YARNS, KEY_CATEGORY, KEY_CREDITS, KEY_PATTERN_ID),
             "$KEY_PROJECT_ID=?",
             arrayOf(projectId),
             null,
@@ -679,13 +683,16 @@ class SupportingDatabase(context: Context) :
             val yarns = cursor.getString(3)
             val category = cursor.getString(4)
             val credits = cursor.getString(5)
+            val patternId = cursor.getString(6)
+
             Project(
                 details = sections.toMutableList(),
                 projectData = projectData,
                 tool = tool,
                 yarns = yarns,
                 category = category,
-                credits = credits
+                credits = credits,
+                patternId = patternId
             )
         } else {
             null
@@ -706,6 +713,7 @@ class SupportingDatabase(context: Context) :
                 val yarns = cursor.getString(4)
                 val category = cursor.getString(5)
                 val credits = cursor.getString(6)
+                val patternId = cursor.getString(6)
 
                 projects.add(
                     Project(
@@ -713,7 +721,9 @@ class SupportingDatabase(context: Context) :
                         projectData = projectData,
                         tool = tool,
                         yarns = yarns,
-                        category = category
+                        category = category,
+                        credits = credits,
+                        patternId = patternId
                     )
                 )
             } while (cursor.moveToNext())
@@ -732,6 +742,8 @@ class SupportingDatabase(context: Context) :
             put(KEY_CATEGORY, project.category)
             put(KEY_CREDITS, project.credits)
             put(KEY_COMMENTS, Gson().toJson(project.comments))
+            put(KEY_PATTERN_ID, project.patternId)
+
         }
         return db.update(
             TABLE_PROJECTS,
@@ -761,6 +773,7 @@ class SupportingDatabase(context: Context) :
             put(KEY_YARNS, project.yarns)
             put(KEY_CREDITS, project.credits)
             put(KEY_COMMENTS, Gson().toJson(project.comments))
+            put(KEY_PATTERN_ID,  project.patternId)
 
         }
         return db.insertWithOnConflict(TABLE_PROJECTS, null, values, SQLiteDatabase.CONFLICT_REPLACE)
@@ -770,7 +783,7 @@ class SupportingDatabase(context: Context) :
         val db = this.readableDatabase
         val cursor = db.query(
             TABLE_PROJECTS,
-            arrayOf(KEY_DETAILS, KEY_PROJECT_DATA, KEY_TOOL, KEY_YARNS, KEY_CATEGORY, KEY_CREDITS, KEY_COMMENTS),
+            arrayOf(KEY_DETAILS, KEY_PROJECT_DATA, KEY_TOOL, KEY_YARNS, KEY_CATEGORY, KEY_CREDITS, KEY_COMMENTS, KEY_PATTERN_ID),
             "$KEY_PROJECT_ID=?",
             arrayOf(projectId),
             null,
@@ -788,6 +801,7 @@ class SupportingDatabase(context: Context) :
             val category = cursor.getString(4)
             val credits = cursor.getString(5)
             val comments: MutableMap<String, Comment> = Gson().fromJson(cursor.getString(6), typeTokenMap)
+            val patternId = cursor.getString(7)
 
             Project(
                 details = sections.toMutableList(),
@@ -796,7 +810,8 @@ class SupportingDatabase(context: Context) :
                 yarns = yarns,
                 category = category,
                 credits = credits,
-                comments = comments
+                comments = comments,
+                patternId = patternId
             )
         } else {
             null
@@ -819,6 +834,7 @@ class SupportingDatabase(context: Context) :
                 val category = cursor.getString(5)
                 val comments: MutableMap<String, Comment> = Gson().fromJson(cursor.getString(6), typeTokenMap)
                 val credits = cursor.getString(7)
+                val patternId = cursor.getString(8)
 
                 projects.add(
                     Project(
@@ -828,7 +844,8 @@ class SupportingDatabase(context: Context) :
                         yarns = yarns,
                         category = category,
                         comments = comments,
-                        credits = credits
+                        credits = credits,
+                        patternId = patternId
                     )
                 )
             } while (cursor.moveToNext())

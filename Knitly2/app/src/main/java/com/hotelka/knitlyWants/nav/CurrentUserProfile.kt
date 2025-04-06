@@ -59,7 +59,7 @@ fun CurrentUserProfileScreen() {
         snapshot.children.forEach { blog ->
             var id = blog.value
             refBlogs.child(id.toString()).get().addOnSuccessListener {
-                usersBlogs.add(it.getValue(Blog::class.java)!!)
+                it.getValue(Blog::class.java)?.let { element -> usersBlogs.add(element) }
             }
 
         }

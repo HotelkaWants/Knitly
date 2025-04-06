@@ -1,3 +1,4 @@
+import org.gradle.kotlin.dsl.libs
 import org.jetbrains.kotlin.konan.properties.Properties
 
 plugins {
@@ -49,6 +50,8 @@ android {
 }
 
 dependencies {
+    implementation(libs.composePipette)
+    implementation (libs.colorpicker.compose)
     implementation (libs.accompanist.swiperefresh)
     implementation(libs.imageCrop)
     implementation(libs.androidx.core.ktx)
@@ -79,6 +82,8 @@ dependencies {
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.coil.compose)
+    implementation(libs.coil.svg)
+    implementation (libs.compose.color.picker)
     implementation(libs.coil.network.okhttp)
     implementation (libs.accompanist.insets)
     implementation("com.google.android.gms:play-services-auth:21.2.0") // Google Play Services Auth

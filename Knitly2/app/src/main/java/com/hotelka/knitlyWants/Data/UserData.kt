@@ -13,4 +13,7 @@ data class UserData(
     val linkedAccountsId: String? = "",
     var subscribers: List<String>? = listOf(),
     var subscriptions: List<String>? = listOf(),
+    var chats: List<String> = listOf(),
+    var isOnline: Boolean = false,
+    var token: String? = ""
     )

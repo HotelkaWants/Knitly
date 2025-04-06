@@ -566,7 +566,6 @@ fun PasswordResetAlert(onDismiss: () -> Unit, onSendClicked: (String) -> Unit) {
 @Composable
 fun provideInformationScreen(register: ComponentActivity, linking: Boolean = false) {
     val focusManager = LocalFocusManager.current
-    val keyboard = LocalSoftwareKeyboardController.current
     val composableScope = rememberCoroutineScope()
     val nameError = rememberSaveable { mutableStateOf(false) }
     val usernameError = rememberSaveable { mutableStateOf(false) }
@@ -594,7 +593,7 @@ fun provideInformationScreen(register: ComponentActivity, linking: Boolean = fal
     val cropState = imageCropper.cropState
     if (cropState != null) ImageCropperDialog(
         state = cropState,
-        dialogPadding = PaddingValues(top = 0.dp, start = 0.dp, end = 0.dp, bottom = 80.dp),
+        dialogPadding = PaddingValues(bottom = 80.dp),
         topBar = {
             TopAppBar(
                 title = {},

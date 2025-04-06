@@ -1,52 +1,137 @@
 package com.hotelka.knitlyWants.Tools
 
 import android.content.Context
-import com.google.android.play.core.integrity.p
 import com.hotelka.knitlyWants.R
 
 fun formatRepeatedText(input: String): String {
-    // Split the input string into individual components
-    val components = input.split(", ")
+    val elements = input.split(",").map { it.trim() }.toMutableList()
+    val result = mutableListOf<String>()
 
-    // Create a list to hold the formatted components
-    val formattedComponents = mutableListOf<String>()
+    while (elements.isNotEmpty()) {
+        val first = elements.removeAt(0)
+        var count = 1
+        val repeatedElements = mutableListOf(first)
 
-    // Use a sliding window to detect repeating patterns
-    var i = 0
-    while (i < components.size) {
-        // Try to find the longest repeating pattern starting at position i
-        var patternLength = 1
-        while (i + patternLength * 2 <= components.size) {
-            val firstSegment = components.subList(i, i + patternLength)
-            val secondSegment = components.subList(i + patternLength, i + patternLength * 2)
-            if (firstSegment != secondSegment) {
-                break
-            }
-            patternLength++
+        // Find consecutive repeating elements
+        while (elements.isNotEmpty() && elements.first() == first) {
+            elements.removeAt(0)
+            count++
+            repeatedElements.add(first)
         }
 
-        // If a repeating pattern is found, format it
-        if (patternLength > 1) {
-            val pattern = components.subList(i, i + patternLength).joinToString(", ")
-            var repeatCount = 1
-            while (i + patternLength * (repeatCount + 1) <= components.size &&
-                components.subList(i, i + patternLength) == components.subList(i + patternLength * repeatCount, i + patternLength * (repeatCount + 1))
-            ) {
-                repeatCount++
-            }
-            formattedComponents.add("($pattern)x$repeatCount")
-            i += patternLength * repeatCount
+        if (count > 1) {
+            //Find the pattern inside the repeated elements
+            val pattern = first.replace("sc", "s").replace("inc", "i")
+            result.add("($pattern)x$count")
         } else {
-            // If no repeating pattern, add the component as is
-            formattedComponents.add(components[i])
-            i++
+            result.add(first)
         }
     }
 
-    // Join the formatted components with ", " and return the result
-    return formattedComponents.joinToString(", ")
+    return result.joinToString(", ")
 }
 
+fun distributeDecreases(
+    context: Context,
+    totalStitches: Int,
+    decreases: Int,
+    distribution: String = context.getString(R.string.uniform)
+): String {
+    var sc = context.getString(R.string.sc)
+    var dec = context.getString(R.string.dec)
+    var total = totalStitches - decreases
+
+    if (decreases == 0) return "$totalStitches $sc"
+
+    if (decreases == totalStitches) {
+        return "(1 $dec)x $decreases ($total)"
+    }
+
+    var result = ""
+
+    when (distribution) {
+        context.getString(R.string.uniform) -> {
+            val sbn = totalStitches / decreases - 1
+            val remains = totalStitches % decreases
+            var total = sbn
+            var pattern = ""
+            if (remains != 0) {
+                for (i in 1..decreases) {
+                    total += sbn
+                    result += ("$sbn $sc, 1 $dec")
+                    if (i <= remains) {
+                        result += (", 1 $sc")
+                    }
+                    if (i != decreases) {
+                        result += (", ")
+                    } else {
+                        result = result.replace(pattern, "")
+                    }
+                }
+            } else {
+                result += ("(1 $dec)x$decreases")
+            }
+        }
+
+        context.getString(R.string.start) -> {
+            fun calculateInterval(i: Int, totalDecreases: Int): Int {
+                return totalDecreases - i
+            }
+
+            var currentStitch = 0
+            for (i in 1..decreases) {
+                val interval = calculateInterval(i, decreases)
+                result += if (interval > 0) {
+                    "$interval $sc, 1 $dec"
+                } else {
+                    "1 $dec"
+                }
+                if (i != decreases) {
+                    result += ", "
+                }
+                currentStitch += if (interval > 0) interval + 1 else 1
+            }
+
+            val remainingStitches = totalStitches - currentStitch
+            if (remainingStitches > 0) {
+                result += ", $remainingStitches $sc"
+            }
+        }
+
+        context.getString(R.string.end) -> {
+            fun calculateInterval(i: Int): Int {
+                return i - 1
+            }
+
+            var currentStitch = 0
+            for (i in 1..decreases) {
+                val interval = calculateInterval(i)
+                currentStitch += if (interval > 0) interval + 1 else 1
+            }
+
+            val remainingStitches = totalStitches - currentStitch
+            if (remainingStitches > 0) {
+                result += "$remainingStitches $sc, "
+            }
+            for (i in 1..decreases) {
+                val interval = calculateInterval(i)
+                result += if (interval > 0) {
+                    "$interval $sc, 1 $dec"
+                } else {
+                    "1 $dec"
+                }
+                if (i != decreases) {
+                    result += ", "
+                }
+            }
+        }
+
+        else -> throw IllegalArgumentException()
+    }
+    result += " ($total)"
+
+    return result
+}
 
 fun distributeIncreases(
     context: Context,
@@ -56,11 +141,11 @@ fun distributeIncreases(
 ): String {
     var sc = context.getString(R.string.sc)
     var inc = context.getString(R.string.inc)
-
+    var total = totalStitches + increases
     if (increases == 0) return "$totalStitches $"
 
     if (increases == totalStitches) {
-        return "(1 $inc)x $increases"
+        return "(1 $inc)x $increases ($total)"
     }
 
     var result = ""
@@ -71,20 +156,20 @@ fun distributeIncreases(
             val remains = totalStitches % increases
             var total = sbn
             var pattern = ""
-            if (remains != 0){
+            if (remains != 0) {
                 for (i in 1..increases) {
                     total += sbn
                     result += ("$sbn $sc, 1 $inc")
-                    if (i <= remains){
+                    if (i <= remains) {
                         result += (", 1 $sc")
                     }
-                    if (i != increases){
+                    if (i != increases) {
                         result += (", ")
-                    } else{
+                    } else {
                         result = result.replace(pattern, "")
                     }
                 }
-            } else{
+            } else {
                 result += ("($sbn $sc, 1 $inc)x$increases")
             }
         }
@@ -118,6 +203,7 @@ fun distributeIncreases(
             fun calculateInterval(i: Int): Int {
                 return i - 1
             }
+
             var currentStitch = 0
             for (i in 1..increases) {
                 val interval = calculateInterval(i)
@@ -130,10 +216,10 @@ fun distributeIncreases(
             }
             for (i in 1..increases) {
                 val interval = calculateInterval(i)
-                if (interval > 0) {
-                    result += "$interval $sc, 1 $inc"
+                result += if (interval > 0) {
+                    "$interval $sc, 1 $inc"
                 } else {
-                    result += "1 $inc"
+                    "1 $inc"
                 }
                 if (i != increases) {
                     result += ", "
@@ -144,6 +230,7 @@ fun distributeIncreases(
 
         else -> throw IllegalArgumentException()
     }
+    result += " ($total)"
 
     return result
 }

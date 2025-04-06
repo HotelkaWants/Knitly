@@ -1,5 +1,14 @@
 package com.hotelka.knitlyWants.Data
 
+import androidx.compose.ui.graphics.Color
+import com.hotelka.knitlyWants.nav.StitchType
+
+data class CellData(
+    val stitchType: StitchType? = StitchType.None,
+    val color: Color? = Color.White
+) {
+    constructor(): this(null,null)
+}
 class Category() {
 
     companion object {
@@ -21,6 +30,11 @@ data class Blog(
 
     )
 
+data class PatternData(
+    var rows: Int = 10,
+    var columns: Int = 10,
+    var gridState: List<CellData> = listOf(),
+)
 
 data class Note(var text: String? = "", var imageUrl: MutableList<String?> = mutableListOf())
 data class RowCrochet(
@@ -50,7 +64,8 @@ data class Comment(
     val userId: String? = "",
     val timestamp: String? = "",
     var likes: Likes = Likes(),
-    var additionalImages: MutableList<String?>? = mutableListOf()
+    var additionalImages: MutableList<String?>? = mutableListOf(),
+    var replies: MutableMap<String, Comment>? = LinkedHashMap(),
 )
 data class Likes(
     var total: Int? = 0,
@@ -65,6 +80,7 @@ data class Project(
     val yarns: String? = "",
     var comments: MutableMap<String, Comment>? = LinkedHashMap(),
     var details: MutableList<Detail>? = mutableListOf(),
+    var patternId: String? = "",
 )
 
 data class ProjectsArchive(
@@ -75,3 +91,17 @@ data class ProjectsArchive(
 )
 
 data class DetailRows(var detail: Int? = 0, var row: Int? = 0)
+data class Chat(
+    val id: String? = "",
+    val users: List<String>? = listOf(),
+    var messages: Map<String, Message> = LinkedHashMap(),
+)
+data class Message(
+    var id: String? = "",
+    var user: UserData = UserData(),
+    var text: String? = "",
+    var additionalImages: MutableList<String> = mutableListOf(),
+    var time: Long = 0L,
+    var isChecked: Boolean = false
+
+)

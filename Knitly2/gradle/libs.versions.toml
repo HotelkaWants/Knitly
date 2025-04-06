@@ -3,7 +3,10 @@ accompanistInsetsVersion = "0.31.5-beta"
 accompanistSwiperefreshVersion = "0.24.13-rc"
 agp = "8.8.2"
 coilNetworkOkhttp = "3.0.4"
+coilSvgVersion = "2.5.0"
+colorpickerComposeVersion = "1.0.0"
 commonsLang3 = "3.17.0"
+composeColorPickerAndroidVersion = "0.7.0"
 compressorVersion = "3.0.1"
 coreVersion = "0.1.6"
 gotrueKt = "3.1.1"
@@ -30,13 +33,18 @@ googleidVersion = "1.1.1"
 firebaseAuthVersion = "23.2.0"
 storageKt = "3.1.1"
 firebaseMessagingVersion = "24.1.1"
+composePipette = "1.0.0-alpha02"
+
 [libraries]
 accompanist-insets = { module = "com.google.accompanist:accompanist-insets", version.ref = "accompanistInsetsVersion" }
 accompanist-swiperefresh = { module = "com.google.accompanist:accompanist-swiperefresh", version.ref = "accompanistSwiperefreshVersion" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
-
+coil-svg = { module = "io.coil-kt:coil-svg", version.ref = "coilSvgVersion" }
+compose-color-picker = { module = "com.godaddy.android.colorpicker:compose-color-picker-android", version.ref = "composeColorPickerAndroidVersion" }
+composePipette = { module = "dev.zt64.compose.pipette:compose-pipette", version.ref = "composePipette" }
 
 coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coilNetworkOkhttp" }
+colorpicker-compose = { module = "com.github.skydoves:colorpicker-compose", version.ref = "colorpickerComposeVersion" }
 commons-lang3 = { module = "org.apache.commons:commons-lang3", version.ref = "commonsLang3" }
 compressor = { module = "id.zelory:compressor", version.ref = "compressorVersion" }
 imageCrop = { module = "com.attafitamim.krop:ui", version.ref = "coreVersion" }

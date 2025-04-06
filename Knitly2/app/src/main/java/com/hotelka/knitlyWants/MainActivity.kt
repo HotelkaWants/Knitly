@@ -3,6 +3,7 @@ package com.hotelka.knitlyWants
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -69,6 +71,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
+import androidx.core.view.WindowCompat
 import androidx.credentials.CredentialManager
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavHostController
@@ -84,21 +88,26 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.hotelka.knitlyWants.Auth.RegisterActivity
+import com.hotelka.knitlyWants.Cards.CreateTutorial
 import com.hotelka.knitlyWants.Data.Blog
+import com.hotelka.knitlyWants.Data.Chat
 import com.hotelka.knitlyWants.Data.Project
 import com.hotelka.knitlyWants.Data.ProjectsArchive
 import com.hotelka.knitlyWants.Data.UserData
 import com.hotelka.knitlyWants.FirebaseUtils.CHILD_USERS
 import com.hotelka.knitlyWants.FirebaseUtils.FirebaseAuthenticationHelper
 import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB
+import com.hotelka.knitlyWants.FirebaseUtils.FirebaseMessageReceiver
 import com.hotelka.knitlyWants.Supbase.key
 import com.hotelka.knitlyWants.Supbase.url
 import com.hotelka.knitlyWants.SupportingDatabase.SupportingDatabase
+import com.hotelka.knitlyWants.nav.ChatScreen
 import com.hotelka.knitlyWants.nav.CreateProjectScreen
 import com.hotelka.knitlyWants.nav.CurrentUserProfileScreen
 import com.hotelka.knitlyWants.nav.DashBoard
 import com.hotelka.knitlyWants.nav.EditProfile
 import com.hotelka.knitlyWants.nav.HomeScreen
+import com.hotelka.knitlyWants.nav.NotificationsAndChats
 import com.hotelka.knitlyWants.nav.ProjectOverview
 import com.hotelka.knitlyWants.nav.Tutorials
 import com.hotelka.knitlyWants.nav.UserProfile
@@ -121,6 +130,7 @@ val supabase: SupabaseClient = createSupabaseClient(url, key) {
 
 }
 lateinit var userData: MutableState<UserData>
+var chatOpened: Chat? = null
 var projectCurrent: Project? = null
 var editableProject: Project? = null
 var editableBlog: Blog? = null
@@ -137,6 +147,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         FirebaseApp.initializeApp(this)
         firebaseAuth = FirebaseAuth.getInstance()
         setContent {
@@ -146,10 +157,21 @@ class MainActivity : ComponentActivity() {
                     startActivity(Intent(this@MainActivity, RegisterActivity::class.java))
                     finish()
                 } else {
+                    if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS)
+                        != PackageManager.PERMISSION_GRANTED) {
+
+                        ActivityCompat.requestPermissions(
+                            this,
+                            arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                            101
+                        );
+                    }
                     LaunchedEffect(Unit) {
                         getUser()
+                        FirebaseDB.sendToken()
                     }
-                    users = remember { mutableStateOf(SupportingDatabase(baseContext).getAllUsers()) }
+                    users =
+                        remember { mutableStateOf(SupportingDatabase(baseContext).getAllUsers()) }
 
                     Surface(color = basic) {
                         FirebaseDB.createSupportingDatabase(baseContext)
@@ -162,6 +184,17 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        var prefs = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
+        val id = prefs.getString("idSelected", firebaseAuth.currentUser!!.uid)
+        FirebaseDB.isOnlineSend(true, id.toString())
+    }
+
+    override fun onPause() {
+        super.onPause()
+        FirebaseDB.isOnlineSend(false, firebaseAuth.currentUser!!.uid)
+    }
     fun getUser() {
         var prefs = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
         val id = prefs.getString("idSelected", firebaseAuth.currentUser!!.uid)
@@ -197,7 +230,7 @@ class MainActivity : ComponentActivity() {
         NavHost(
             navController = navController,
 
-            startDestination = "home",
+            startDestination = "createTutorial",
 
             modifier = Modifier.padding(paddingValues = padding),
 
@@ -205,9 +238,16 @@ class MainActivity : ComponentActivity() {
                 composable("createProject") {
                     CreateProjectScreen(editableProject, editableBlog)
                 }
-
                 composable("myProfile") {
                     CurrentUserProfileScreen()
+                }
+                composable("notificationsAndChats") {
+                    NotificationsAndChats()
+                }
+                composable("chat") {
+                    if (chatOpened != null) {
+                        ChatScreen(chat = chatOpened!!)
+                    }
                 }
                 composable("editProfile") {
                     EditProfile()
@@ -221,6 +261,9 @@ class MainActivity : ComponentActivity() {
                 composable("tutorials") {
                     Tutorials()
                 }
+                composable("createTutorial"){
+                    CreateTutorial()
+                }
                 composable("userProfile") {
                     if (userWatching != null) {
                         UserProfile(userWatching!!)
@@ -229,9 +272,9 @@ class MainActivity : ComponentActivity() {
                 composable("projectOverview") {
                     if (projectCurrent != null) {
                         ProjectOverview(projectCurrent!!)
-                    } else if(blogCurrent != null) (
-                        ProjectOverview(blog = blogCurrent)
-                    )
+                    } else if (blogCurrent != null) (
+                            ProjectOverview(blog = blogCurrent)
+                            )
                 }
                 composable("workingOnProject") {
                     if (currentProjectInProgress != null) {
@@ -345,21 +388,19 @@ class MainActivity : ComponentActivity() {
                     },
                     actions = {
                         IconButton(onClick = {
-
+                            navController.navigate("notificationsAndChats")
                         }) {
-                            if (navController.currentDestination?.route != "createProject") {
-                                BadgedBox(badge = {
-                                    Badge(
-                                        modifier.size(10.dp), containerColor = headers_activeElement
-                                    ) {
-                                    }
-                                }) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.FavoriteBorder,
-                                        tint = textColor,
-                                        contentDescription = "Fav icon"
-                                    )
+                            BadgedBox(badge = {
+                                Badge(
+                                    modifier.size(10.dp), containerColor = headers_activeElement
+                                ) {
                                 }
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Outlined.FavoriteBorder,
+                                    tint = textColor,
+                                    contentDescription = "Fav icon"
+                                )
                             }
 
                         }
@@ -475,7 +516,8 @@ class MainActivity : ComponentActivity() {
 
                         var account by remember { mutableStateOf<UserData?>(null) }
                         if (userData.value.linkedAccountsId.toString() != "") {
-                            FirebaseDB.refUsers.child(userData.value.linkedAccountsId.toString()).get().addOnSuccessListener{
+                            FirebaseDB.refUsers.child(userData.value.linkedAccountsId.toString())
+                                .get().addOnSuccessListener {
                                 account =
                                     it.getValue<UserData>(UserData::class.java)
                             }
@@ -497,7 +539,7 @@ class MainActivity : ComponentActivity() {
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 AsyncImage(
-                                    model = if (account!!.profilePictureUrl?.contains("supabase") == true) account!!.profilePictureUrl
+                                    model = if (account!!.profilePictureUrl?.isNotEmpty() == true) account!!.profilePictureUrl
                                     else R.drawable.baseline_account_circle_24,
                                     contentDescription = null,
                                     modifier = Modifier

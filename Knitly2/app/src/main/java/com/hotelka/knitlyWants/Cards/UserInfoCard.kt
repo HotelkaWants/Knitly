@@ -2,6 +2,7 @@ package com.hotelka.knitlyWants.Cards
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -28,9 +29,11 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.hotelka.knitlyWants.Data.UserData
 import com.hotelka.knitlyWants.R
+import com.hotelka.knitlyWants.navController
 import com.hotelka.knitlyWants.ui.theme.darkBasic
 import com.hotelka.knitlyWants.ui.theme.textColor
 import com.hotelka.knitlyWants.ui.theme.white
+import com.hotelka.knitlyWants.userWatching
 
 @Preview
 @Composable
@@ -45,6 +48,10 @@ fun UserInfoCard(user: UserData = UserData(), lazyOrientation: String = "Horizon
             .clip(RoundedCornerShape(10.dp))
             .border(1.dp, darkBasic, RoundedCornerShape(10.dp))
             .background(white)
+            .clickable{
+                userWatching = user
+                navController.navigate("userProfile")
+            }
     ) {
         AsyncImage(
             modifier = Modifier.wrapContentWidth()

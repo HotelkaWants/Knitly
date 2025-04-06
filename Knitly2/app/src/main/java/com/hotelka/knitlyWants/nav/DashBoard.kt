@@ -65,8 +65,11 @@ import kotlinx.coroutines.delay
 @Composable
 fun DashBoard() {
     var usersDrafts = remember { mutableStateListOf<Any>() }
-    usersDrafts.addAll(SupportingDatabase(LocalContext.current).getAllProjectsDraft())
-    usersDrafts.addAll(SupportingDatabase(LocalContext.current).getAllBlogDrafts())
+    usersDrafts.apply {
+        clear()
+        addAll(SupportingDatabase(LocalContext.current).getAllProjectsDraft())
+        addAll(SupportingDatabase(LocalContext.current).getAllBlogDrafts())
+    }
 
     val projectsInProgress = remember { mutableStateListOf<ProjectsArchive>() }
 
@@ -82,6 +85,7 @@ fun DashBoard() {
     }
     LaunchedEffect(Unit) {
         FirebaseDB.collectCurrentUserProjectsWorks { project ->
+            projectsInProgress.clear()
             projectsInProgress.add(project)
             if (project.progress == 1f) projectsCompletedCount++
             else projectsInProgressCount++
@@ -218,7 +222,10 @@ fun DashBoard() {
 
                             Column(
                                 modifier = Modifier
-                                    .wrapContentSize()
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                                    .padding(end = 20.dp)
+                                    .wrapContentHeight()
                                     .clip(RoundedCornerShape(20.dp))
                                     .background(headers_activeElement)
                             ) {
@@ -259,7 +266,9 @@ fun DashBoard() {
 
                             Column(
                                 modifier = Modifier
-                                    .wrapContentSize()
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                                    .wrapContentHeight()
                                     .clip(RoundedCornerShape(20.dp))
                                     .background(accent_secondary),
                             ) {

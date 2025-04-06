@@ -42,6 +42,7 @@ import com.hotelka.knitlyWants.Data.Blog
 import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB
 import com.hotelka.knitlyWants.R
 import com.hotelka.knitlyWants.blogCurrent
+import com.hotelka.knitlyWants.formatNumber
 import com.hotelka.knitlyWants.navController
 import com.hotelka.knitlyWants.ui.theme.headers_activeElement
 import com.hotelka.knitlyWants.ui.theme.textColor
@@ -126,7 +127,7 @@ fun BlogCard(blog: Blog = Blog()) {
                     colorFilter = ColorFilter.tint(textColor)
                 )
                 Text(
-                    text = blog.projectData!!.reviews.toString(),
+                    text = formatNumber(blog.projectData!!.reviews),
                     fontSize = 12.sp,
                     modifier = Modifier
                         .align(Alignment.CenterVertically)
@@ -136,7 +137,7 @@ fun BlogCard(blog: Blog = Blog()) {
                     fontWeight = FontWeight.Bold,
                 )
                 Image(
-                    imageVector = if (blog.projectData!!.likes.users?.contains(
+                    imageVector = if (likes.users?.contains(
                             userData.value.userId
                         ) == true
                     ) Icons.Filled.Favorite
@@ -165,10 +166,14 @@ fun BlogCard(blog: Blog = Blog()) {
 
                             }
                         },
-                    colorFilter = iconColorFilter
+                    colorFilter = if (likes.users?.contains(
+                            userData.value.userId
+                        ) == true
+                    ) ColorFilter.tint(headers_activeElement)
+                    else ColorFilter.tint(Color.Gray)
                 )
                 Text(
-                    text = blog.projectData!!.likes.total.toString(),
+                    text = formatNumber(likeCount!!),
                     fontSize = 12.sp,
                     modifier = Modifier
                         .align(Alignment.CenterVertically)

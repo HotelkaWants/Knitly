@@ -45,7 +45,7 @@ import com.hotelka.knitlyWants.Cards.TutorialCard
 import com.hotelka.knitlyWants.Data.HistoryTutorialsData
 import com.hotelka.knitlyWants.R
 import com.hotelka.knitlyWants.SupportingDatabase.SupportingDatabase
-import com.hotelka.knitlyWants.ui.theme.SearchTabs
+import com.hotelka.knitlyWants.ui.theme.Tabs
 import com.hotelka.knitlyWants.ui.theme.basic
 import com.hotelka.knitlyWants.ui.theme.darkBasic
 import com.hotelka.knitlyWants.ui.theme.textColor
@@ -119,24 +119,24 @@ fun Tutorials() {
             dividerColor = darkBasic,
         ),
     ) {
-        val knittingBaseTab = SearchTabs(
+        val knittingBaseTab = Tabs(
             selectedIcon = ImageVector.vectorResource(R.drawable.baseline_library_books_24),
             unselectedIcon = ImageVector.vectorResource(R.drawable.baseline_library_books_24),
             text = stringResource(R.string.knittingBase)
         )
-        val knittingTab = SearchTabs(
+        val knittingTab = Tabs(
             selectedIcon = ImageVector.vectorResource(R.drawable.kneedles),
             unselectedIcon = ImageVector.vectorResource(R.drawable.kneedles),
             text = stringResource(R.string.knitting)
         )
-        val crochetTab = SearchTabs(
+        val crochetTab = Tabs(
             selectedIcon = ImageVector.vectorResource(R.drawable.hook),
             unselectedIcon = ImageVector.vectorResource(R.drawable.hook),
             text = stringResource(R.string.crocheting)
         )
         val scope = rememberCoroutineScope()
         val tabs =
-            remember { mutableStateListOf<SearchTabs>(knittingBaseTab, knittingTab, crochetTab) }
+            remember { mutableStateListOf<Tabs>(knittingBaseTab, knittingTab, crochetTab) }
         var pagerState = rememberPagerState(
             initialPage = 0,
             pageCount = { 3 }

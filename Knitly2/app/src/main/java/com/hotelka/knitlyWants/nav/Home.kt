@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.Badge
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
@@ -25,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -34,12 +36,12 @@ import com.hotelka.knitlyWants.Cards.BlogCard
 import com.hotelka.knitlyWants.Cards.ProjectContainer
 import com.hotelka.knitlyWants.Data.UserData
 import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB
-import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB.Companion.refProjectsInProgress
 import com.hotelka.knitlyWants.R
 import com.hotelka.knitlyWants.SupportingDatabase.SupportingDatabase
 import com.hotelka.knitlyWants.editableProject
 import com.hotelka.knitlyWants.navController
 import com.hotelka.knitlyWants.ui.theme.accent_secondary
+import com.hotelka.knitlyWants.ui.theme.headers_activeElement
 import com.hotelka.knitlyWants.ui.theme.textColor
 import com.hotelka.knitlyWants.ui.theme.white
 import com.hotelka.knitlyWants.userData
@@ -52,13 +54,17 @@ import kotlinx.coroutines.delay
 fun HomeScreen() {
     val context = LocalContext.current
     val db = SupportingDatabase(context)
-    var projects by remember { mutableStateOf(db.getAllProjects())}
+    var projects by remember { mutableStateOf(db.getAllProjects()) }
     Log.d("projectsHome", db.getAllProjects().toString())
     var blogs = db.getAllBlog()
     var refreshing by remember { mutableStateOf(true) }
 
     LaunchedEffect(refreshing) {
         if (refreshing) {
+            FirebaseDB.createSupportingDatabase(context)
+            projects = db.getAllProjects()
+            blogs = db.getAllBlog()
+            users.value = db.getAllUsers()
             delay(2000)
             refreshing = false
         }
@@ -68,11 +74,7 @@ fun HomeScreen() {
         state = rememberSwipeRefreshState(isRefreshing = refreshing),
         onRefresh = {
             refreshing = true
-            FirebaseDB.createSupportingDatabase(context)
-            projects = db.getAllProjects()
-            blogs = db.getAllBlog()
-            users.value = db.getAllUsers()
-                    },
+        },
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(
@@ -137,8 +139,9 @@ fun HomeScreen() {
                         color = white
                     )
                 }
-                itemsIndexed(projects, key = {index, item -> item.projectData!!.projectId!!}) { index, project ->
-
+                itemsIndexed(
+                    projects,
+                    key = { index, item -> item.projectData!!.projectId!! }) { index, project ->
                     ProjectContainer(project, false)
                 }
             }
@@ -166,7 +169,11 @@ fun HomeScreen() {
 }
 
 @Composable
-fun UserItem(user: UserData) {
+@Preview
+fun UserItem(user: UserData = UserData()) {
+    FirebaseDB.isOnlineGet(user.userId){
+        user.isOnline = it
+    }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -177,23 +184,34 @@ fun UserItem(user: UserData) {
                 navController.navigate("userProfile")
             },
         content = {
-            if (user.profilePictureUrl != null) {
-                AsyncImage(
-                    model = user.profilePictureUrl,
-                    modifier = Modifier
-                        .size(70.dp)
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop,
-                    contentDescription = "SchemePreview"
-                )
-            } else {
-                AsyncImage(
-                    model = R.drawable.baseline_account_circle_24,
-                    modifier = Modifier.size(70.dp),
-                    contentScale = ContentScale.FillBounds,
-                    contentDescription = "SchemePreview"
-                )
+            Box {
+                if (user.profilePictureUrl != null) {
+                    AsyncImage(
+                        model = user.profilePictureUrl,
+                        modifier = Modifier
+                            .size(70.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop,
+                        contentDescription = "SchemePreview"
+                    )
+                } else {
+                    AsyncImage(
+                        model = R.drawable.baseline_account_circle_24,
+                        modifier = Modifier.size(70.dp),
+                        contentScale = ContentScale.FillBounds,
+                        contentDescription = "SchemePreview"
+                    )
+                }
+                if (user.isOnline) {
+                    Badge(
+                        containerColor = headers_activeElement,
+                        modifier = Modifier
+                            .size(15.dp)
+                            .align(Alignment.TopEnd)
+                    )
+                }
             }
+
 
             Text(
                 text = user.username!!,

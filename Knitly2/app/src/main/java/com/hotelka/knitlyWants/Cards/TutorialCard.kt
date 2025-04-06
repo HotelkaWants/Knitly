@@ -62,6 +62,7 @@ fun TutorialCard() {
                 .background(white)
                 .padding(10.dp)
         ) {
+
             Text(
                 text = title,
                 fontWeight = FontWeight.Bold,

@@ -7,6 +7,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
@@ -63,21 +65,20 @@ import com.hotelka.knitlyWants.R
 import com.hotelka.knitlyWants.SupportingDatabase.SupportingDatabase
 import kotlinx.coroutines.launch
 import java.util.Locale
+import java.util.UUID
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Search(scrollState: LazyListState, setPadding: (Dp) -> Unit) {
-    val supportingDatabase = SupportingDatabase(LocalContext.current)
-    var searchHistory = remember { mutableStateListOf<HistoryData>() }
-    searchHistory.addAll(supportingDatabase.getHistoryList())
+    val context = LocalContext.current
+    val supportingDatabase = SupportingDatabase(context)
     var query by remember { mutableStateOf("") }
     var active by remember { mutableStateOf(false) }
     var tabsActive by remember { mutableStateOf(false) }
     var isSearchBarExpanded by remember { mutableStateOf(true) }
 
     var bestResult by remember { mutableStateOf<BestResult?>(null) }
-
 
     LaunchedEffect(scrollState) {
         snapshotFlow { scrollState.firstVisibleItemScrollOffset }
@@ -141,13 +142,6 @@ fun Search(scrollState: LazyListState, setPadding: (Dp) -> Unit) {
             query = it.toLowerCase(Locale.ROOT)
         },
         onSearch = {
-            searchHistory.add(
-                HistoryData(
-                    id = "",
-                    historyTitle = it,
-                    resultType = ""
-                )
-            )
             tabsActive = true
         },
         active = active,
@@ -185,24 +179,24 @@ fun Search(scrollState: LazyListState, setPadding: (Dp) -> Unit) {
             dividerColor = darkBasic,
         ),
     ) {
-        val projectsTab = SearchTabs(
+        val projectsTab = Tabs(
             selectedIcon = ImageVector.vectorResource(R.drawable.baseline_space_dashboard_24),
             unselectedIcon = ImageVector.vectorResource(R.drawable.outline_space_dashboard_24),
             text = stringResource(R.string.projects)
         )
-        val usersTab = SearchTabs(
+        val usersTab = Tabs(
             selectedIcon = Icons.Filled.AccountCircle,
             unselectedIcon = Icons.Outlined.AccountCircle,
             text = stringResource(R.string.users)
         )
-        val bestFound = SearchTabs(
+        val bestFound = Tabs(
             selectedIcon = ImageVector.vectorResource(R.drawable.outline_manage_search_24),
             unselectedIcon = ImageVector.vectorResource(R.drawable.baseline_manage_search_24),
             text = stringResource(R.string.bestFound)
         )
         val scope = rememberCoroutineScope()
         val tabs =
-            remember { mutableStateListOf<SearchTabs>(bestFound, projectsTab, usersTab) }
+            remember { mutableStateListOf<Tabs>(bestFound, projectsTab, usersTab) }
         var pagerState = rememberPagerState(
             initialPage = 0,
             pageCount = { 3 }
@@ -271,6 +265,11 @@ fun Search(scrollState: LazyListState, setPadding: (Dp) -> Unit) {
                                     LazyRow(modifier = Modifier.wrapContentHeight()) {
                                         items(filteredUsers) { user ->
                                             UserInfoCard(user)
+                                            SupportingDatabase(context).addHistory(
+                                                selectedResult = user.userId,
+                                                type = "user",
+                                                UUID.randomUUID().toString()
+                                            )
                                         }
                                     }
                                 }
@@ -304,20 +303,7 @@ fun Search(scrollState: LazyListState, setPadding: (Dp) -> Unit) {
                 }
             }
 
-        } else {
-            searchHistory.forEach {
-                Row(modifier = Modifier.padding(14.dp)) {
-                    Icon(
-                        imageVector = ImageVector.vectorResource(R.drawable.baseline_history_24),
-                        contentDescription = "History",
-                        tint = textColor
-                    )
-                    Text(text = it.historyTitle)
-                }
-            }
-
         }
-
 
     }
 
@@ -325,7 +311,7 @@ fun Search(scrollState: LazyListState, setPadding: (Dp) -> Unit) {
 }
 
 
-data class SearchTabs(
+data class Tabs(
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector,
     val text: String,

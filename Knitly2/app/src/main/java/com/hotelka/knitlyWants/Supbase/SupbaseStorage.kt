@@ -9,10 +9,10 @@ import io.github.jan.supabase.storage.upload
 import org.apache.commons.lang3.RandomStringUtils
 import java.io.File
 
-suspend fun uploadFile(bucket: String, userID: String, file: ByteArray): String? {
+suspend fun uploadFile(bucket: String, userID: String, file: ByteArray, extension: String = ".png"): String? {
     val bucket = supabase.storage.from(bucket)
 
-    val fileName = "$userID/" + RandomStringUtils.randomAlphanumeric(15) + ".png"
+    val fileName = "$userID/" + RandomStringUtils.randomAlphanumeric(15) + extension
     val response = bucket.upload(
         path = fileName,
         data = file,

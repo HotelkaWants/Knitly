@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -51,6 +50,8 @@ import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB.Companion.refProjects
 import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB.Companion.refUsers
 import com.hotelka.knitlyWants.FirebaseUtils.PROJECTS
 import com.hotelka.knitlyWants.R
+import com.hotelka.knitlyWants.chatOpened
+import com.hotelka.knitlyWants.navController
 import com.hotelka.knitlyWants.ui.theme.basic
 import com.hotelka.knitlyWants.ui.theme.headers_activeElement
 import com.hotelka.knitlyWants.ui.theme.textColor
@@ -67,7 +68,7 @@ fun UserProfile(user: UserData) {
             var id = project.value
             refProjects.child(id.toString()).get().addOnSuccessListener {
                 var project = it.getValue(Project::class.java)
-                if (!usersProjects.contains(project)){
+                if (!usersProjects.contains(project)) {
                     project?.let { element -> usersProjects.add(element) }
                 }
             }
@@ -79,9 +80,9 @@ fun UserProfile(user: UserData) {
         snapshot.children.forEach { blog ->
             var id = blog.value
             refBlogs.child(id.toString()).get().addOnSuccessListener {
-                val blog = it.getValue(Blog::class.java)!!
+                val blog = it.getValue(Blog::class.java)
                 if (!usersBlogs.contains(blog))
-                    usersBlogs.add(blog)
+                    blog?.let { element -> usersBlogs.add(element) }
             }
 
         }
@@ -147,7 +148,27 @@ fun UserProfile(user: UserData) {
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     Button(
-                        onClick = { },
+                        onClick = {
+                            var exist = false
+                            var chatId = ""
+                            user.chats.forEach {
+                                if (userData.value.chats.contains(it)) {
+                                    exist = true; chatId = it
+                                }
+                            }
+                            if (!exist) {
+                                FirebaseDB.createChat(user) {
+                                    chatOpened = it
+                                    navController.navigate("chat")
+                                }
+                            } else {
+                                FirebaseDB.getChat(chatId) {
+                                    chatOpened = it
+                                    navController.navigate("chat")
+                                }
+
+                            }
+                        },
                         modifier = Modifier
                             .weight(1f)
                             .padding(end = 8.dp),
