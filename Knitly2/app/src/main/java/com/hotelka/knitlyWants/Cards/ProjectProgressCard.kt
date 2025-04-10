@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -93,7 +94,7 @@ fun ProjectProgressCard(project: ProjectsArchive = ProjectsArchive()) {
             )
             Column(Modifier.background(white).fillMaxHeight().padding(15.dp), verticalArrangement = Arrangement.SpaceAround) {
                 Text(
-                    modifier = Modifier,
+                    modifier = Modifier.widthIn(min = 70.dp, max = 120.dp),
                     text = project.project.projectData.title!!,
                     fontSize = 20.sp,
                     color = textColor,
@@ -102,14 +103,14 @@ fun ProjectProgressCard(project: ProjectsArchive = ProjectsArchive()) {
                     )
                 )
                 Text(
-                    modifier = Modifier.width(70.dp).padding(top = 5.dp).heightIn(0.dp, 50.dp),
+                    modifier = Modifier.widthIn(min = 70.dp, max = 100.dp).padding(top = 5.dp).heightIn(0.dp, 50.dp),
                     overflow = TextOverflow.Ellipsis,
                     text = if (project.progress != 1f) currentDetail!!.title!!
                     else stringResource(R.string.projectIsDone),
                     fontSize = 16.sp,
                     color = textColor,
                 )
-                AnimatedVisibility(visible = project.progress != 1f) {
+                if ( project.progress != 1f) {
                     Text(
                         modifier = Modifier.padding(top = 5.dp),
                         text = "Row${project.detailRows!!.row!! + 1}",

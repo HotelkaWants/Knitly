@@ -46,6 +46,7 @@ fun CurrentUserProfileScreen() {
 
     var usersProjects = remember { mutableStateListOf<Project>() }
     refUsers.child(userData.value.userId).child(PROJECTS).get().addOnSuccessListener { snapshot ->
+        usersProjects.clear()
         snapshot.children.forEach { project ->
             var id = project.value
             refProjects.child(id.toString()).get().addOnSuccessListener {
@@ -56,6 +57,7 @@ fun CurrentUserProfileScreen() {
     }
     var usersBlogs = remember { mutableStateListOf<Blog>() }
     refUsers.child(userData.value.userId).child(BLOGS).get().addOnSuccessListener { snapshot ->
+        usersBlogs.clear()
         snapshot.children.forEach { blog ->
             var id = blog.value
             refBlogs.child(id.toString()).get().addOnSuccessListener {
@@ -64,7 +66,6 @@ fun CurrentUserProfileScreen() {
 
         }
     }
-
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -98,13 +99,16 @@ fun CurrentUserProfileScreen() {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 var usersCreds =
-                    userData.value.username.toString() + if (userData.value.name.toString()
-                            .isNotEmpty()
-                    ) ", ${userData.value.name.toString()}" else "" + userData.value.lastName.toString()
+                    userData.value.username.toString() + ", " + userData.value.name.toString() + " " +
+                            if (userData.value.lastName.toString().isNotEmpty()) {
+                                 userData.value.lastName.toString()
+                            } else {
+                                ""
+                            }
                 Text(
                     text = usersCreds,
                     fontSize = 24.sp,
-                    color = textColor, // Dark text color
+                    color = textColor,
                     style = MaterialTheme.typography.headlineLarge
                 )
 
@@ -135,10 +139,7 @@ fun CurrentUserProfileScreen() {
                     }
 
                     Button(
-                        onClick = {
-
-
-                        },
+                        onClick = { navController.navigate("friendsAndFans") },
                         colors = ButtonDefaults.buttonColors(containerColor = headers_activeElement),
                         modifier = Modifier
                             .weight(1f)
@@ -172,7 +173,7 @@ fun CurrentUserProfileScreen() {
                     horizontalArrangement = Arrangement.Start
 
                 ) {
-                    items(usersProjects) { project ->
+                    itemsIndexed(usersProjects) { index, project ->
                         ExpandedProjectCard(project, userData.value)
 
                     }

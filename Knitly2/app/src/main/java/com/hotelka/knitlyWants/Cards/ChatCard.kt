@@ -1,7 +1,8 @@
 package com.hotelka.knitlyWants.Cards
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,7 +29,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -44,43 +44,49 @@ import com.hotelka.knitlyWants.ui.theme.headers_activeElement
 import com.hotelka.knitlyWants.ui.theme.textColor
 import com.hotelka.knitlyWants.userData
 
-@Preview
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun ChatCard(chat: Chat = Chat()) {
+fun ChatCard(chat: Chat = Chat(), invokeAlert: (String, String, Chat) -> Unit) {
+    var profilePicture by remember { mutableStateOf<String>("") }
+    var name by remember { mutableStateOf<String>("") }
+    var isOnline by remember { mutableStateOf(false) }
+    var lastMessage by remember {
+        mutableStateOf(if (chat.messages.isNotEmpty()) chat.messages.values.sortedBy { message -> message.time }
+            .last() else null)
+    }
+    var userId by remember { mutableStateOf("") }
+    chat.users?.forEach { user ->
+        if (user != userData.value.userId) {
+            userId = user
+            FirebaseDB.getUser(user) { user ->
+                profilePicture = user.profilePictureUrl.toString()
+                name = user.name.toString()
+                user.lastName?.let {
+                    if (it.isNotEmpty()) {
+                        name += " $it"
+                    }
+                }
+            }
+            FirebaseDB.isOnlineGet(userId) { isOnline = it }
+        }
+    }
     Box(
         Modifier
             .fillMaxWidth()
             .wrapContentHeight()
-            .clickable {
-                chatOpened = chat
-                navController.navigate("chat")
-            }
-            .background(darkBasic)
-            .padding(vertical = 2.dp)
+            .combinedClickable(
+                onClick = {
+                    chatOpened = chat
+                    navController.navigate("chat")
+                },
+                onLongClick = {
+                    invokeAlert(userId, name, chat)
+                }
+            )
             .background(basic)
             .padding(5.dp)
     ) {
-        var profilePicture by remember { mutableStateOf<String>("") }
-        var name by remember { mutableStateOf<String>("") }
-        var isOnline by remember { mutableStateOf(false) }
-        var lastMessage by remember {
-            mutableStateOf(if (chat.messages.isNotEmpty()) chat.messages.values.sortedBy { message -> message.time }
-                .last() else null)
-        }
-        chat.users?.forEach { user ->
-            if (user != userData.value.userId) {
-                FirebaseDB.getUser(user) { user ->
-                    profilePicture = user.profilePictureUrl.toString()
-                    name = user.name.toString()
-                    user.lastName?.let {
-                        if (it.isNotEmpty()) {
-                            name += " $it"
-                        }
-                    }
-                    isOnline = user.isOnline
-                }
-            }
-        }
+
 
         Row {
             Box {
@@ -89,7 +95,7 @@ fun ChatCard(chat: Chat = Chat()) {
                     else R.drawable.baseline_account_circle_24,
                     contentDescription = null,
                     modifier = Modifier
-                        .size(50.dp)
+                        .size(60.dp)
                         .clip(CircleShape)
                         .align(Alignment.Center),
                     contentScale = ContentScale.Crop
@@ -105,8 +111,8 @@ fun ChatCard(chat: Chat = Chat()) {
                 }
             }
             Column(
-                verticalArrangement = Arrangement.SpaceEvenly,
-                modifier = Modifier.height(50.dp)
+                verticalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.height(60.dp).padding(top = 5.dp)
             ) {
                 Text(
                     modifier = Modifier
@@ -115,14 +121,21 @@ fun ChatCard(chat: Chat = Chat()) {
                         .padding(horizontal = 5.dp)
                         .padding(end = 50.dp),
                     text = name,
-                    fontSize = 14.sp,
+                    fontSize = 16.sp,
                     color = textColor,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = if (lastMessage == null) stringResource(R.string.sayHi) else
-                        if (lastMessage?.user!!.userId == userData.value.userId) stringResource(R.string.you) + lastMessage?.text!!
-                        else "$name: ${lastMessage?.text}",
+                        if (lastMessage?.user == userData.value.userId) stringResource(R.string.you) +
+                                (if (lastMessage?.text?.isEmpty() == true && lastMessage?.additionalImages?.isNotEmpty() == true)
+                                    stringResource(R.string.pics)
+                                else lastMessage?.text)
+                        else "$name: ${
+                            if (lastMessage?.text?.isEmpty() == true && lastMessage?.additionalImages?.isNotEmpty() == true)
+                                stringResource(R.string.pics)
+                            else lastMessage?.text
+                        }",
                     modifier = Modifier
                         .wrapContentWidth()
                         .wrapContentHeight()
@@ -130,12 +143,13 @@ fun ChatCard(chat: Chat = Chat()) {
                         .padding(end = 50.dp),
                     overflow = TextOverflow.Ellipsis,
                     color = textColor,
-                    style = LocalTextStyle.current.copy(fontSize = 12.sp),
+                    style = LocalTextStyle.current.copy(fontSize = 14.sp),
                 )
             }
             Row(
                 modifier = Modifier
                     .padding(end = 10.dp)
+                    .align(Alignment.Bottom)
                     .fillMaxWidth()
                     .height(45.dp),
                 verticalAlignment = Alignment.Bottom,
@@ -143,7 +157,7 @@ fun ChatCard(chat: Chat = Chat()) {
             ) {
                 Text(
                     text = if (lastMessage == null) "" else lastMessage!!.time.toTimeString(),
-                    fontSize = 12.sp,
+                    fontSize = 14.sp,
                     color = textColor,
                 )
                 if (lastMessage != null) {
@@ -155,7 +169,7 @@ fun ChatCard(chat: Chat = Chat()) {
                         contentDescription = null,
                         tint = textColor,
                         modifier = Modifier
-                            .padding(start = 10.dp)
+                            .padding(start = 10.dp, bottom = 5.dp)
                             .size(20.dp)
                     )
                 }

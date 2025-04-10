@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -45,6 +46,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -58,6 +60,7 @@ import com.hotelka.knitlyWants.R
 import com.hotelka.knitlyWants.formatNumber
 import com.hotelka.knitlyWants.navController
 import com.hotelka.knitlyWants.projectCurrent
+import com.hotelka.knitlyWants.toDateTimeString
 import com.hotelka.knitlyWants.ui.theme.headers_activeElement
 import com.hotelka.knitlyWants.ui.theme.textColor
 import com.hotelka.knitlyWants.ui.theme.white
@@ -93,21 +96,18 @@ fun ExpandedProjectCard(project: Project, author: UserData) {
     ) {
 
         Column {
-            Box(
-
-            ) {
+            Box {
                 Image(
                     modifier = Modifier
-                        .height(250.dp)
-                        .width(250.dp),
+                        .size(300.dp),
                     painter = rememberAsyncImagePainter(project.projectData!!.cover),
                     contentScale = ContentScale.Crop,
                     contentDescription = "Scheme Cover"
                 )
                 Column(
                     Modifier
-                        .width(250.dp)
-                        .padding(top = 220.dp)
+                        .width(300.dp)
+                        .padding(top = 270.dp)
                         .align(Alignment.BottomStart)
                         .background(white,RoundedCornerShape(topEnd = 20.dp, topStart = 20.dp))
                         .padding(horizontal = 15.dp)
@@ -118,7 +118,7 @@ fun ExpandedProjectCard(project: Project, author: UserData) {
                     Text(
                         text = project.projectData.title!!,
                         modifier = Modifier
-                            .width(150.dp),
+                            .width(200.dp),
                         fontSize = 22.sp,
                         color = textColor
 
@@ -204,7 +204,7 @@ fun ExpandedProjectCard(project: Project, author: UserData) {
                 ) {
                 Box(
                     modifier = Modifier
-                        .width(250.dp)
+                        .width(300.dp)
                         .wrapContentHeight()
                         .background(
                             white,
@@ -216,7 +216,8 @@ fun ExpandedProjectCard(project: Project, author: UserData) {
                     Column {
 
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(top = 5.dp),
+                            verticalAlignment = Alignment.Bottom,
                         ) {
 
                             AsyncImage(
@@ -234,20 +235,20 @@ fun ExpandedProjectCard(project: Project, author: UserData) {
 
                             )
                             Text(
-                                modifier = Modifier.padding(start = 10.dp),
+                                modifier = Modifier.padding(start = 10.dp, bottom = 5.dp),
                                 text = author.username.toString(),
                                 color = textColor,
                             )
 
                             }
-                        if (project?.category != Category.Blog) {
+                        if (project.category != Category.Blog) {
                             Row(
                                 modifier = Modifier.padding(10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Icon(
                                     imageVector = ImageVector.vectorResource(
-                                        if (project?.category == Category.Knitting) R.drawable.kneedles
+                                        if (project.category == Category.Knitting) R.drawable.kneedles
                                         else R.drawable.hook
                                     ),
                                     contentDescription = null,
@@ -255,7 +256,7 @@ fun ExpandedProjectCard(project: Project, author: UserData) {
                                 )
                                 Text(
                                     modifier = Modifier.padding(start = 10.dp),
-                                    text = project?.tool.toString(),
+                                    text = project.tool.toString(),
                                     color = textColor,
                                 )
                             }
@@ -263,8 +264,9 @@ fun ExpandedProjectCard(project: Project, author: UserData) {
                         }
 
                         Text(
-                            modifier = Modifier.padding(horizontal = 5.dp),
-                            text = project?.projectData!!.description,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 5.dp).heightIn(0.dp, 80.dp),
+                            text = project.projectData!!.description,
                             color = textColor,
                             fontSize = 16.sp,
                             style = LocalTextStyle.current.merge(

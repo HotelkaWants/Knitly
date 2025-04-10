@@ -7,10 +7,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
@@ -34,6 +36,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,6 +47,7 @@ import com.hotelka.knitlyWants.R
 import com.hotelka.knitlyWants.blogCurrent
 import com.hotelka.knitlyWants.formatNumber
 import com.hotelka.knitlyWants.navController
+import com.hotelka.knitlyWants.projectCurrent
 import com.hotelka.knitlyWants.ui.theme.headers_activeElement
 import com.hotelka.knitlyWants.ui.theme.textColor
 import com.hotelka.knitlyWants.ui.theme.white
@@ -52,7 +56,6 @@ import com.hotelka.knitlyWants.userData
 @Preview
 @Composable
 fun BlogCard(blog: Blog = Blog()) {
-    var context = LocalContext.current
     var likes by remember { mutableStateOf(blog.projectData!!.likes) }
     var likeIcon by remember { mutableStateOf(
         if (blog.projectData!!.likes.users?.contains(
@@ -73,11 +76,13 @@ fun BlogCard(blog: Blog = Blog()) {
     Column(
         horizontalAlignment = Alignment.Start,
         modifier = Modifier
+            .wrapContentWidth()
             .padding(horizontal = 15.dp, vertical = 5.dp)
             .clip(RoundedCornerShape(30.dp))
             .background(white)
             .clickable {
                 FirebaseDB.sendReviewBlog(blog.projectData!!.projectId.toString(), blog.projectData!!.reviews)
+                projectCurrent = null
                 blogCurrent = blog
                 navController.navigate("projectOverview")
             },
@@ -85,7 +90,7 @@ fun BlogCard(blog: Blog = Blog()) {
             AsyncImage(
                 model = blog.projectData!!.cover,
                 modifier = Modifier
-                    .width(300.dp)
+                    .width(400.dp)
                     .height(300.dp),
                 contentScale = ContentScale.Crop,
                 contentDescription = "SchemePreview"
@@ -94,9 +99,11 @@ fun BlogCard(blog: Blog = Blog()) {
             Text(
                 text = blog.projectData!!.title!!,
                 modifier = Modifier
-                    .width(300.dp)
+                    .width(400.dp)
+                    .heightIn(0.dp, 50.dp)
                     .padding(horizontal = 5.dp)
                     .padding(10.dp),
+                overflow = TextOverflow.Ellipsis,
                 fontSize = 24.sp,
                 color = textColor,
                 fontWeight = FontWeight.Bold
@@ -105,10 +112,11 @@ fun BlogCard(blog: Blog = Blog()) {
             if (blog.projectData!!.description != "") {
                 Text(
                     text = blog.projectData!!.description,
-                    textAlign = TextAlign.Justify,
                     modifier = Modifier
-                        .widthIn(0.dp, 300.dp)
+                        .widthIn(0.dp, 400.dp)
+                        .heightIn(0.dp, 80.dp)
                         .padding(start = 20.dp, end = 20.dp, bottom = 15.dp),
+                    overflow = TextOverflow.Ellipsis,
                     fontSize = 16.sp,
                     color = textColor
                 )
@@ -116,7 +124,7 @@ fun BlogCard(blog: Blog = Blog()) {
 
             Row(
                 Modifier
-                    .fillMaxWidth()
+                    .wrapContentWidth()
                     .padding(bottom = 10.dp, start = 20.dp)
             ) {
                 Image(

@@ -110,7 +110,7 @@ class FirebaseMessageReceiver : FirebaseMessagingService() {
         // Create an object of NotificationManager class to
         // notify the
         // user of events that happen in the background.
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager?
+        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager?
         // Check if the Android Version is greater than Oreo
         val notificationChannel = NotificationChannel(
             channel_id, "web_app",

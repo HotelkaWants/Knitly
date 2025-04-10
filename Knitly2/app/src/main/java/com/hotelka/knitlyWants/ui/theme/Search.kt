@@ -7,7 +7,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -16,10 +15,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
@@ -28,6 +25,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
@@ -53,19 +51,20 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.hotelka.knitlyWants.Cards.ProjectContainer
 import com.hotelka.knitlyWants.Cards.UserInfoCard
 import com.hotelka.knitlyWants.Data.BestResult
-import com.hotelka.knitlyWants.Data.HistoryData
 import com.hotelka.knitlyWants.Data.Project
 import com.hotelka.knitlyWants.Data.UserData
+import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB
 import com.hotelka.knitlyWants.R
 import com.hotelka.knitlyWants.SupportingDatabase.SupportingDatabase
 import kotlinx.coroutines.launch
 import java.util.Locale
-import java.util.UUID
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -123,8 +122,10 @@ fun Search(scrollState: LazyListState, setPadding: (Dp) -> Unit) {
     bestResult!!.projects.apply {
         filteredProjects.clear()
         forEachIndexed { index, project ->
-            if (project.projectData!!.description.toLowerCase(Locale.ROOT).contains(query) ||
-                project.projectData.author!!.toLowerCase(Locale.ROOT).contains(query) ||
+            var author by remember { mutableStateOf(UserData()) }
+            FirebaseDB.getUser(project.projectData!!.authorID.toString()){author = it}
+            if (project.projectData.description.toLowerCase(Locale.ROOT).contains(query) ||
+                author.username!!.toLowerCase(Locale.ROOT).contains(query) ||
                 project.projectData.title!!.toLowerCase(Locale.ROOT).contains(query)
             ) {
                 filteredProjects.add(project)
@@ -261,22 +262,40 @@ fun Search(scrollState: LazyListState, setPadding: (Dp) -> Unit) {
                     when (pagerState.currentPage) {
                         0 -> {
                             LazyColumn(modifier = Modifier.fillMaxSize()) {
-                                item {
-                                    LazyRow(modifier = Modifier.wrapContentHeight()) {
-                                        items(filteredUsers) { user ->
-                                            UserInfoCard(user)
-                                            SupportingDatabase(context).addHistory(
-                                                selectedResult = user.userId,
-                                                type = "user",
-                                                UUID.randomUUID().toString()
+
+                                if (filteredUsers.isEmpty() && filteredProjects.isEmpty()){
+                                    item {
+                                        Row(Modifier.fillMaxWidth()) {
+                                            Text(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 10.dp),
+                                                text = stringResource(R.string.noResult),
+                                                textAlign = TextAlign.Center,
+                                                color = textColor,
+                                                fontWeight = FontWeight.Bold
                                             )
+                                        }
+                                        HorizontalDivider(
+                                            Modifier.height(2.dp),
+                                            color = darkBasic
+                                        )
+                                    }
+                                }
+                                item {
+                                    Column (modifier = Modifier.wrapContentHeight()) {
+                                        filteredUsers.sortedByDescending { user -> user.subscribers?.size }.take(5).forEach { user ->
+                                            UserInfoCard(user)
+                                            HorizontalDivider(Modifier.height(2.dp), color = darkBasic)
                                         }
                                     }
                                 }
                                 item {
                                     Column {
                                         filteredProjects.forEachIndexed { index, project ->
-                                            ProjectContainer(project, existsList[index])
+                                            var author by remember { mutableStateOf(UserData()) }
+                                            FirebaseDB.getUser(project.projectData!!.authorID.toString()){author = it}
+                                            ProjectContainer(project, author)
                                         }
                                     }
                                 }
@@ -285,16 +304,58 @@ fun Search(scrollState: LazyListState, setPadding: (Dp) -> Unit) {
 
                         1 -> {
                             LazyColumn(modifier = Modifier.fillMaxSize()) {
+                                if (filteredProjects.isEmpty()){
+                                    item {
+                                        Row(Modifier.fillMaxWidth()) {
+                                            Text(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 10.dp),
+                                                text = stringResource(R.string.noResult),
+                                                textAlign = TextAlign.Center,
+                                                color = textColor,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                        HorizontalDivider(
+                                            Modifier.height(2.dp),
+                                            color = darkBasic
+                                        )
+                                    }
+                                }
                                 itemsIndexed(filteredProjects) { index, project ->
-                                    ProjectContainer(project, existsList[index])
+                                    var author by remember { mutableStateOf(UserData()) }
+                                    FirebaseDB.getUser(project.projectData!!.authorID.toString()){author = it}
+                                    ProjectContainer(project, author)
                                 }
                             }
                         }
 
                         2 -> {
                             LazyColumn(modifier = Modifier.fillMaxSize()) {
+                                if (filteredUsers.isEmpty()){
+                                    item {
+                                        Row(Modifier.fillMaxWidth()) {
+                                            Text(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 10.dp),
+                                                text = stringResource(R.string.noResult),
+                                                textAlign = TextAlign.Center,
+                                                color = textColor,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                        HorizontalDivider(
+                                            Modifier.height(2.dp),
+                                            color = darkBasic
+                                        )
+                                    }
+                                }
                                 items(filteredUsers) { user ->
-                                    UserInfoCard(user, "Vertical")
+                                    UserInfoCard(user)
+                                    HorizontalDivider(Modifier.height(2.dp), color = darkBasic)
+
                                 }
 
                             }

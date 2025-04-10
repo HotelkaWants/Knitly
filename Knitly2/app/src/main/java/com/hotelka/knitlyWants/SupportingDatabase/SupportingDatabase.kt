@@ -24,7 +24,7 @@ class SupportingDatabase(context: Context) :
 
     companion object {
         private const val DATABASE_NAME = "KnitlySupportDB"
-        private const val DATABASE_VERSION = 11
+        private const val DATABASE_VERSION = 16
 
         private const val TABLE_PROJECTS_IN_PROGRESS = "ProjectsInProgress"
         private const val KEY_PROJECT = "project"
@@ -47,12 +47,6 @@ class SupportingDatabase(context: Context) :
         private const val TABLE_BLOGS = "Blogs"
         private const val TABLE_BLOGS_DRAFTS = "BlogsDrafts"
         private const val KEY_ADDITIONAL_IMAGES = "additionalImages"
-
-        private const val TABLE_HISTORY_TUTORIALS = "HistoryTutorials"
-        private const val TABLE_HISTORY = "History"
-        private const val KEY_HISTORY_ID = "historyId"
-        private const val KEY_HISTORY_TITLE = "selectedResult"
-        private const val KEY_RESULT_TYPE = "selectedResultType"
 
         private const val TABLE_USERS = "Users"
         private const val KEY_USER_ID = "userId"
@@ -127,23 +121,10 @@ class SupportingDatabase(context: Context) :
                 + "$KEY_CREDITS TEXT,"
                 + "$KEY_PATTERN_ID TEXT)")
 
-
-        val CREATE_HISTORY_TABLE = ("CREATE TABLE $TABLE_HISTORY ("
-                + "$KEY_HISTORY_ID TEXT PRIMARY KEY,"
-                + "$KEY_RESULT_TYPE TEXT,"
-                + "$KEY_HISTORY_TITLE TEXT)")
-
-        val CREATE_HISTORY_TUTORIALS_TABLE = ("CREATE TABLE $TABLE_HISTORY_TUTORIALS ("
-                + "$KEY_HISTORY_ID TEXT PRIMARY KEY,"
-                + "$KEY_RESULT_TYPE TEXT,"
-                + "$KEY_HISTORY_TITLE TEXT)")
-
         db?.execSQL(CREATE_PROJECTS_IN_PROGRESS)
         db?.execSQL(CREATE_BLOGS_TABLE)
         db?.execSQL(CREATE_BLOGS_DRAFTS_TABLE)
         db?.execSQL(CREATE_PROJECTS_TABLE)
-        db?.execSQL(CREATE_HISTORY_TABLE)
-        db?.execSQL(CREATE_HISTORY_TUTORIALS_TABLE)
         db?.execSQL(CREATE_PROJECTS_TABLE_DRAFT)
         db?.execSQL(CREATE_USERS_TABLE)
     }
@@ -155,29 +136,9 @@ class SupportingDatabase(context: Context) :
         db?.execSQL("DROP TABLE IF EXISTS $TABLE_BLOGS_DRAFTS")
         db?.execSQL("DROP TABLE IF EXISTS $TABLE_PROJECTS_DRAFT")
         db?.execSQL("DROP TABLE IF EXISTS $TABLE_USERS")
-        db?.execSQL("DROP TABLE IF EXISTS $TABLE_HISTORY")
-        db?.execSQL("DROP TABLE IF EXISTS $TABLE_HISTORY_TUTORIALS")
         onCreate(db)
     }
 
-    fun updateUser(user: UserData): Int {
-        val db = this.writableDatabase
-        val values = ContentValues().apply {
-            put(KEY_USER_ID, user.userId)
-            put(KEY_USERNAME, user.username)
-            put(KEY_NAME, user.name)
-            put(KEY_LAST_NAME, user.lastName)
-            put(KEY_EMAIL, user.email)
-            put(KEY_BIO, user.bio)
-            put(KEY_PROFILE_PICTURE_URL, user.profilePictureUrl)
-            put(KEY_PROJECTS, Gson().toJson(user.Projects))
-            put(KEY_BLOGS, Gson().toJson(user.blogs))
-            put(KEY_LINKED_ACCOUNT_ID, user.linkedAccountsId)
-            put(KEY_SUBSCRIBERS, Gson().toJson(user.subscribers))
-            put(KEY_SUBSCRIPTIONS, Gson().toJson(user.subscriptions))
-        }
-        return db.update(TABLE_USERS, values, "$KEY_USER_ID = ?", arrayOf(user.userId))
-    }
 
     fun deleteUser(user: UserData): Int {
         val db = this.writableDatabase
@@ -302,93 +263,7 @@ class SupportingDatabase(context: Context) :
         return users
     }
 
-    fun addHistory(selectedResult: String, type: String, idHistory: String): Long {
-        val db = this.writableDatabase
-        val values = ContentValues().apply {
-            put(KEY_HISTORY_ID, idHistory)
-            put(KEY_HISTORY_TITLE, selectedResult)
-            put(KEY_RESULT_TYPE, type)
 
-        }
-        return db.insert(TABLE_HISTORY, null, values)
-    }
-
-    fun getHistoryList(): MutableList<HistoryData> {
-        val history = mutableListOf<HistoryData>()
-        val db = this.readableDatabase
-        val cursor: Cursor = db.rawQuery("SELECT * FROM $TABLE_HISTORY", null)
-
-        if (cursor.moveToFirst()) {
-            do {
-                val id = cursor.getString(0)
-                val historyTitle = cursor.getString(1)
-                val resultType = cursor.getString(2)
-                history.add(
-                    HistoryData(
-                        id = id,
-                        historyTitle = historyTitle,
-                        resultType = resultType
-                    )
-                )
-            } while (cursor.moveToNext())
-        }
-        cursor.close()
-        return history
-    }
-
-    fun getHistoryTutorialsList(): MutableList<HistoryTutorialsData> {
-        val history = mutableListOf<HistoryTutorialsData>()
-        val db = this.readableDatabase
-        val cursor: Cursor = db.rawQuery("SELECT * FROM $TABLE_HISTORY_TUTORIALS", null)
-
-        if (cursor.moveToFirst()) {
-            do {
-                val id = cursor.getString(0)
-                val historyTitle = cursor.getString(1)
-                val resultType = cursor.getString(2)
-                history.add(
-                    HistoryTutorialsData(
-                        id = id,
-                        historyTitle = historyTitle,
-                        resultType = resultType
-                    )
-                )
-            } while (cursor.moveToNext())
-        }
-        cursor.close()
-        return history
-    }
-
-    fun addHistoryTutorials(selectedResult: String, type: String, idHistory: String): Long {
-        val db = this.writableDatabase
-        val values = ContentValues().apply {
-            put(KEY_HISTORY_ID, idHistory)
-            put(KEY_HISTORY_TITLE, selectedResult)
-            put(KEY_RESULT_TYPE, type)
-
-        }
-        return db.insert(TABLE_HISTORY_TUTORIALS, null, values)
-    }
-
-    fun getHistory(historyId: String): HistoryData? {
-        val db = this.readableDatabase
-        val cursor = db.query(
-            TABLE_HISTORY, arrayOf(KEY_HISTORY_ID, KEY_HISTORY_TITLE, KEY_RESULT_TYPE),
-            "$KEY_HISTORY_ID=?", arrayOf(historyId), null, null, null, null
-        )
-        return if (cursor.moveToFirst()) {
-            val id = cursor.getString(0)
-            val historyTitle = cursor.getString(1)
-            val resultType = cursor.getString(2)
-            HistoryData(
-                id = id,
-                historyTitle = historyTitle,
-                resultType = resultType
-            )
-        } else {
-            null
-        }
-    }
 
     fun updateBlogDraft(blog: Blog): Int {
         val db = this.writableDatabase
@@ -451,24 +326,6 @@ class SupportingDatabase(context: Context) :
             put(KEY_CREDITS, blog.category)
         }
         return db.insertWithOnConflict(TABLE_BLOGS_DRAFTS, null, values, SQLiteDatabase.CONFLICT_REPLACE)
-    }
-
-    fun updateBlog(blog: Blog): Int {
-        val db = this.writableDatabase
-        val values = ContentValues().apply {
-            put(KEY_PROJECT_DATA, Gson().toJson(blog.projectData))
-            put(KEY_ADDITIONAL_IMAGES, Gson().toJson(blog.additionalImages))
-            put(KEY_CATEGORY, blog.category)
-            put(KEY_CREDITS, blog.credits)
-            put(KEY_COMMENTS,  Gson().toJson(blog.comments))
-
-        }
-        return db.update(
-            TABLE_BLOGS,
-            values,
-            "$KEY_PROJECT_ID = ?",
-            arrayOf(blog.projectData!!.projectId)
-        )
     }
 
     fun deleteBlog(blog: Blog?): Int {
@@ -546,24 +403,6 @@ class SupportingDatabase(context: Context) :
         )
     }
 
-    fun updateProjectInProgress(project: ProjectsArchive): Int {
-        val db = this.writableDatabase
-        val values = ContentValues().apply {
-            put(KEY_PROJECT_ID, project.project!!.projectData!!.projectId )
-            put(KEY_PROJECT, Gson().toJson(project.project))
-            put(KEY_PROGRESS, project.progress)
-            put(KEY_TIME_IN_PROGRESS, project.timeInProgress)
-            put(KEY_PROGRESS, Gson().toJson(project.detailRows))
-
-        }
-        return db.update(
-            TABLE_PROJECTS_IN_PROGRESS,
-            values,
-            "$KEY_PROJECT_ID = ?",
-            arrayOf(project.project!!.projectData!!.projectId)
-        )
-    }
-
     fun deleteProjectInProgress(project: ProjectsArchive?): Int {
         val db = this.writableDatabase
         return db.delete(TABLE_PROJECTS_IN_PROGRESS, "$KEY_PROJECT_ID = ?", arrayOf(project?.project?.projectData?.projectId))
@@ -582,32 +421,6 @@ class SupportingDatabase(context: Context) :
             null
         )
         return cursor.moveToFirst()
-    }
-
-    fun getProjectInProgress(projectId: String): ProjectsArchive? {
-        val db = this.readableDatabase
-        val cursor = db.query(
-            TABLE_PROJECTS_IN_PROGRESS,
-            arrayOf(KEY_PROJECT, KEY_PROGRESS, KEY_TIME_IN_PROGRESS, KEY_PROGRESS_DETAILS),
-            "$KEY_PROJECT_ID=?",
-            arrayOf(projectId),
-            null,
-            null,
-            null,
-            null
-        )
-        return if (cursor.moveToFirst()) {
-            var project = Gson().fromJson(cursor.getString(0), Project::class.java)
-            val progress = cursor.getFloat(1)
-            val timeInProgress = cursor.getString(2)
-            val detailRows = Gson().fromJson(cursor.getString(3), DetailRows::class.java)
-            ProjectsArchive(
-                project = project,
-                progress = progress,
-                timeInProgress = timeInProgress,
-                detailRows = detailRows
-            )
-        } else null
     }
 
     fun getAllProjectInProgress(): List<ProjectsArchive> {
@@ -664,41 +477,6 @@ class SupportingDatabase(context: Context) :
         return db.insertWithOnConflict(TABLE_PROJECTS_DRAFT, null, values, SQLiteDatabase.CONFLICT_REPLACE)
     }
 
-    fun getProjectDraft(projectId: String): Project? {
-        val db = this.readableDatabase
-        val cursor = db.query(
-            TABLE_PROJECTS_DRAFT,
-            arrayOf(KEY_DETAILS, KEY_PROJECT_DATA, KEY_TOOL, KEY_YARNS, KEY_CATEGORY, KEY_CREDITS, KEY_PATTERN_ID),
-            "$KEY_PROJECT_ID=?",
-            arrayOf(projectId),
-            null,
-            null,
-            null,
-            null
-        )
-        return if (cursor.moveToFirst()) {
-            val sections = Gson().fromJson(cursor.getString(0), Array<Detail>::class.java).toList()
-            val projectData = Gson().fromJson(cursor.getString(1), ProjectData::class.java)
-            val tool = cursor.getString(2)
-            val yarns = cursor.getString(3)
-            val category = cursor.getString(4)
-            val credits = cursor.getString(5)
-            val patternId = cursor.getString(6)
-
-            Project(
-                details = sections.toMutableList(),
-                projectData = projectData,
-                tool = tool,
-                yarns = yarns,
-                category = category,
-                credits = credits,
-                patternId = patternId
-            )
-        } else {
-            null
-        }
-    }
-
     fun getAllProjectsDraft(): List<Project> {
         val projects = mutableListOf<Project>()
         val db = this.readableDatabase
@@ -713,7 +491,7 @@ class SupportingDatabase(context: Context) :
                 val yarns = cursor.getString(4)
                 val category = cursor.getString(5)
                 val credits = cursor.getString(6)
-                val patternId = cursor.getString(6)
+                val patternId = cursor.getString(7)
 
                 projects.add(
                     Project(

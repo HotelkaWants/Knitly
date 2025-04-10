@@ -201,7 +201,7 @@ class RegisterActivity : ComponentActivity() {
                 if (task.isSuccessful) {
                     FirebaseDB.checkExistUser(task.result.user?.uid.toString(),
                         rememberId = { id ->
-                            var prefs = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
+                            var prefs = getSharedPreferences("Prefs", MODE_PRIVATE)
                             val editor = prefs.edit()
                             editor.putString("idSelected", id)
                             editor.apply()
@@ -641,7 +641,7 @@ fun provideInformationScreen(register: ComponentActivity, linking: Boolean = fal
         FirebaseDB.refUsers.get().addOnSuccessListener {
             it.children.forEach { user ->
                 val username = user.getValue<UserData>(UserData::class.java)?.username.toString()
-                if (usernameWanted.replace(" ", "").contains(username)) isUserExist = true
+                if (usernameWanted.replace(" ", "") == username) isUserExist = true
             }
         }
         return isUserExist
@@ -855,10 +855,14 @@ fun provideInformationScreen(register: ComponentActivity, linking: Boolean = fal
                                 name = name.value,
                                 lastName = lastName.value,
                                 email = auth.email.toString(),
-                                profilePictureUrl = getData(
-                                    "avatars",
-                                    uploadFile("avatars", id, imageBitmapToByteArray(imageBitmap!!)).toString()
-                                ),
+                                profilePictureUrl = if (imageBitmap != null){
+                                    getData(
+                                        "avatars",
+                                        uploadFile("avatars", imageBitmapToByteArray(imageBitmap!!)).toString()
+                                    )
+                                } else {
+                                    ""
+                                },
                                 bio = bio.value,
                                 linkedAccountsId = userData.value.userId
                             )

@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.Icon
@@ -73,9 +74,11 @@ import kotlin.toString
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CommentItem(
+    isReply: Boolean = false,
     postType: Any?,
     postId: String,
     commentId: String,
+    parentCommentId: String = commentId,
     userData: UserData,
     commentText: String,
     timestamp: String,
@@ -83,6 +86,7 @@ fun CommentItem(
     additionalImages: MutableList<String?>,
     onImageClick: () -> Unit,
     onReply:(Boolean) -> Unit,
+    callDelete:() -> Unit
 ) {
     var reply by remember { mutableStateOf(false) }
     var liked by remember { mutableStateOf(likes.users!!.contains(com.hotelka.knitlyWants.userData.value.userId)) }
@@ -127,37 +131,48 @@ fun CommentItem(
                     fontSize = 12.sp,
                     color = Color.Gray
                 )
+                if (userData.userId == com.hotelka.knitlyWants.userData.value.userId) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        tint = textColor,
+                        contentDescription = "Delete",
+                        modifier = Modifier.clickable {
+                            callDelete()
+                        }
+                            .padding(start = 6.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(4.dp))
 
             var links by remember { mutableStateOf(extractUrls(commentText.toString())) }
             val annotatedText = buildAnnotatedString {
-                links.forEach {
-                    withStyle(
-                        style = SpanStyle(
-                            color = textColor,
-                        )
-                    ) { append(commentText.split(it.url)[0]) }
-
-                    withLink(LinkAnnotation.Url(url = it.url)) {
+                withStyle(
+                    style = SpanStyle(
+                        color = textColor,
+                    ),
+                ) { append(commentText.toString()) }
+                links.forEach { urlData ->
+                    addLink(
+                        url = LinkAnnotation.Url(url = urlData.url),
+                        start = urlData.start,
+                        end = urlData.end
+                    )
                         addStyle(
                             style = SpanStyle(
                                 color = headers_activeElement,
                                 textDecoration = TextDecoration.Underline
                             ),
-                            start = it.start,
-                            end = it.end
+                            start = urlData.start,
+                            end = urlData.end
                         )
                         addStringAnnotation(
                             tag = "URL",
-                            annotation = it.url,
-                            start = it.start,
-                            end = it.end
+                            annotation = urlData.url,
+                            start = urlData.start,
+                            end = urlData.end
                         )
-                        append(it.url)
-
-                    }
 
                 }
             }
@@ -230,12 +245,21 @@ fun CommentItem(
                         } else {
                             likeCount--
                         }
-                        FirebaseDB.sendLikeComment(
-                            commentId, postId, when (postType) {
-                                is Blog -> refBlogs
-                                else -> refProjects
-                            }
-                        )
+                        if (!isReply) {
+                            FirebaseDB.sendLikeComment(
+                                commentId, postId, when (postType) {
+                                    is Blog -> refBlogs
+                                    else -> refProjects
+                                }
+                            )
+                        } else {
+                            FirebaseDB.sendLikeReplyComment(
+                                 parentCommentId, commentId, postId, when (postType) {
+                                    is Blog? -> refBlogs
+                                    else -> refProjects
+                                }
+                            )
+                        }
                     }
                 ) {
                     Icon(

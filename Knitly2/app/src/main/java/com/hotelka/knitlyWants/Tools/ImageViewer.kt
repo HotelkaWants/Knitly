@@ -28,6 +28,7 @@ fun ImageViewer(
     imageUrls: List<String?>,
     modifier: Modifier = Modifier,
     startIndex: Int = 0,
+    onDismiss:() -> Unit ,
 ) {
     val pagerState = rememberPagerState(pageCount = { imageUrls.size }, initialPage = startIndex)
     val scope = rememberCoroutineScope()
@@ -80,6 +81,9 @@ fun ImageViewer(
 
                         scale = newScale
                         if (scale == 1f && zoom == 1f){
+                            if (pan.y > 130f){
+                                onDismiss()
+                            }
                             if (pan.x > 50f){
                                 scope.launch{
                                     pagerState.animateScrollToPage(page - 1)

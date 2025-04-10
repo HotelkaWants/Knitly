@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -48,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.hotelka.knitlyWants.Data.Project
 import com.hotelka.knitlyWants.Data.ProjectsArchive
+import com.hotelka.knitlyWants.Data.UserData
 import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB
 import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB.Companion.refProjectsInProgress
 import com.hotelka.knitlyWants.R
@@ -55,6 +57,7 @@ import com.hotelka.knitlyWants.SupportingDatabase.SupportingDatabase
 import com.hotelka.knitlyWants.formatNumber
 import com.hotelka.knitlyWants.navController
 import com.hotelka.knitlyWants.projectCurrent
+import com.hotelka.knitlyWants.toDateTimeString
 import com.hotelka.knitlyWants.ui.theme.basic
 import com.hotelka.knitlyWants.ui.theme.headers_activeElement
 import com.hotelka.knitlyWants.ui.theme.textColor
@@ -62,7 +65,8 @@ import com.hotelka.knitlyWants.ui.theme.white
 import com.hotelka.knitlyWants.userData
 
 @Composable
-fun ProjectContainer(project: Project, exists: Boolean) {
+fun ProjectContainer(project: Project, author: UserData) {
+
     var context = LocalContext.current
     var started by remember {mutableStateOf(context.getString(R.string.started))}
     refProjectsInProgress.child(userData.value.userId).child(project.projectData!!.projectId!!).get().addOnSuccessListener{
@@ -103,11 +107,12 @@ fun ProjectContainer(project: Project, exists: Boolean) {
         Row(
             modifier = Modifier
                 .background(basic)
-                .wrapContentHeight()
+                .wrapContentHeight(),
+            horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxHeight()
+                    .fillMaxSize().weight(1f).padding(end = 5.dp)
             ) {
                 Column(
                     modifier = Modifier
@@ -120,7 +125,7 @@ fun ProjectContainer(project: Project, exists: Boolean) {
                             .padding(start = 5.dp, top = 5.dp),
                         color = textColor,
                         fontSize = 15.sp,
-                        text = "${project.projectData.author}, ${project.projectData.date}",
+                        text = "${author.username}, ${project.projectData.date!!.toDateTimeString()}",
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Bold,
                     )
@@ -174,7 +179,7 @@ fun ProjectContainer(project: Project, exists: Boolean) {
                         Text(
                             text = started,
                             modifier = Modifier
-                                .padding(start = 4.dp)
+                                .padding(start = 3.dp)
                                 .background(
                                     color = headers_activeElement,
                                     shape = RoundedCornerShape(10.dp)
@@ -210,7 +215,7 @@ fun ProjectContainer(project: Project, exists: Boolean) {
                             fontSize = 12.sp,
                             modifier = Modifier
                                 .align(Alignment.CenterVertically)
-                                .padding(horizontal = 5.dp),
+                                .padding(start = 5.dp),
                             color = textColor,
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Bold,
@@ -221,6 +226,7 @@ fun ProjectContainer(project: Project, exists: Boolean) {
                             Modifier
                                 .size(25.dp)
                                 .align(Alignment.CenterVertically)
+                                .padding(start = 3.dp)
                                 .clickable {
                                     FirebaseDB.sendLike(
                                         project.projectData.projectId.toString(),
@@ -258,7 +264,7 @@ fun ProjectContainer(project: Project, exists: Boolean) {
 
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .fillMaxWidth().weight(1f)
             ) {
 
                 AsyncImage(

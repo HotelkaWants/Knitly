@@ -6,7 +6,7 @@
     <string name="register">Registration</string>
     <string name="password">Password</string>
     <string name="registration">Hi! 🌸 \nLet\'s create your first account!✏️</string>
-    <string name="default_web_client_id">473011120684-48pckftfj8r9diq0k85m2th9am5ksetj.apps.googleusercontent.com</string>
+    <string name="default_web_client_id">464389724786-lm806jqrkfbjju85vsnlkudc66k5dr5n.apps.googleusercontent.com</string>
     <string name="subscriptions">Subscriptions</string>
     <string name="edit_profile">Edit Profile</string>
     <string name="log_out">Log out</string>
@@ -140,5 +140,23 @@
     <string name="default_notification_channel_id">222333</string>
     <string name="outline">Outline</string>
     <string name="addCover">Add Cover</string>
+    <string name="notChats">You have no chats:(</string>
+    <string name="deleteChat">"Do you want to delete chat with "</string>
+    <string name="guest">Guest</string>
+    <string name="befriend">Befriend</string>
+    <string name="deleteComment">Are you sure you want to delete comment and all the replies?</string>
+    <string name="noFriends">No fans and friends yet:(</string>
+    <string name="noResult">Nothing found🔍</string>
+    <string name="notOnline">Offline</string>
+    <string name="isOnline">Online</string>
+    <string name="pics">Pics</string>
+    <string name="deleteMessage">"Delete message from "</string>
+    <string name="edited">Edited</string>
+    <string name="home">Home</string>
+    <string name="dashboard">Dashboard</string>
+    <string name="tutorials">Tutorials</string>
+    <string name="createProject">New Project</string>
+    <string name="increases">Increases</string>
+    <string name="decreases">Decreases</string>
 
 </resources>

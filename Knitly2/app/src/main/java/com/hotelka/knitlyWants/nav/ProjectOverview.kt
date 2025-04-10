@@ -5,8 +5,12 @@ import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -24,6 +28,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -36,13 +41,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -56,10 +66,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Color.Companion.Transparent
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.LinkAnnotation
@@ -69,7 +82,6 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -101,8 +113,10 @@ import com.hotelka.knitlyWants.currentProjectInProgress
 import com.hotelka.knitlyWants.editableBlog
 import com.hotelka.knitlyWants.editableProject
 import com.hotelka.knitlyWants.extractUrls
+import com.hotelka.knitlyWants.formatNumber
 import com.hotelka.knitlyWants.navController
 import com.hotelka.knitlyWants.projectCurrent
+import com.hotelka.knitlyWants.toDateTimeString
 import com.hotelka.knitlyWants.ui.theme.LoadingAnimation
 import com.hotelka.knitlyWants.ui.theme.Shapes
 import com.hotelka.knitlyWants.ui.theme.accent_secondary
@@ -111,25 +125,19 @@ import com.hotelka.knitlyWants.ui.theme.textColor
 import com.hotelka.knitlyWants.ui.theme.textFieldColor
 import com.hotelka.knitlyWants.ui.theme.white
 import com.hotelka.knitlyWants.userData
+import com.hotelka.knitlyWants.userWatching
 import com.hotelka.knitlyWants.users
 import kotlinx.coroutines.launch
 import java.io.File
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import java.util.UUID
 import kotlin.text.isNotEmpty
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
-@Composable
-@Preview
-fun preview() {
-}
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun ProjectOverview(projectData: Project? = null, blog: Blog? = null) {
     var comment by remember { mutableStateOf("") }
     val context = LocalContext.current
+    val keyboard = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
     var additionalImagesComments = remember { mutableStateListOf<String?>() }
 
@@ -137,6 +145,18 @@ fun ProjectOverview(projectData: Project? = null, blog: Blog? = null) {
         mutableStateOf(
             if (projectData != null) projectData.comments!!.values
             else blog?.comments!!.values
+        )
+    }
+    var likes by remember {
+        mutableStateOf(
+            if (projectData != null) projectData.projectData?.likes
+            else blog?.projectData!!.likes
+        )
+    }
+    var likeCount by remember {
+        mutableStateOf(
+            if (projectData != null) projectData.projectData?.likes?.total
+            else blog?.projectData!!.likes.total
         )
     }
     val id =
@@ -193,37 +213,42 @@ fun ProjectOverview(projectData: Project? = null, blog: Blog? = null) {
 
     var links by remember { mutableStateOf(extractUrls(credits.toString())) }
     val annotatedCredits = buildAnnotatedString {
-        links.forEach {
-            withStyle(
+        withStyle(
+            style = SpanStyle(
+                color = textColor,
+            ),
+        ) { append(credits.toString()) }
+        links.forEach { urlData ->
+            addLink(
+                url = LinkAnnotation.Url(url = urlData.url),
+                start = urlData.start,
+                end = urlData.end
+            )
+            addStyle(
                 style = SpanStyle(
-                    color = textColor,
-                )
-            ) { append(credits?.split(it.url)[0]) }
-
-            withLink(LinkAnnotation.Url(url = it.url)) {
-                addStyle(
-                    style = SpanStyle(
-                        color = headers_activeElement,
-                        textDecoration = TextDecoration.Underline
-                    ),
-                    start = it.start,
-                    end = it.end
-                )
-                addStringAnnotation(
-                    tag = "URL",
-                    annotation = it.url,
-                    start = it.start,
-                    end = it.end
-                )
-                append(it.url)
-
-            }
+                    color = headers_activeElement,
+                    textDecoration = TextDecoration.Underline
+                ),
+                start = urlData.start,
+                end = urlData.end
+            )
+            addStringAnnotation(
+                tag = "URL",
+                annotation = urlData.url,
+                start = urlData.start,
+                end = urlData.end
+            )
 
         }
-        if (links.isNotEmpty()) append(credits?.split(links.last().url)?.get(1))
     }
     var images = remember { mutableStateListOf<String?>() }
     var startIndex by remember { mutableIntStateOf(0) }
+
+    FirebaseDB.getPattern(patternId.toString(), authorId) {
+        pattern = it
+        loading = false
+    }
+
     BackHandler {
         if (imageViewer) {
             imageViewer = false
@@ -233,21 +258,14 @@ fun ProjectOverview(projectData: Project? = null, blog: Blog? = null) {
             navController.popBackStack()
         }
     }
-    FirebaseDB.getPattern(patternId.toString(), authorId) {
-        pattern = it
-        loading = false
-    }
     fun sendComment(onDone: () -> Unit) {
         var additionalImages = mutableListOf<String?>()
-        val now = LocalDateTime.now()
-        val formatter = DateTimeFormatter.ofPattern("HH:mm, dd.MM.yyyy ")
-        val formatted = now.format(formatter)
         scope.launch {
             var comment = Comment(
                 id = UUID.randomUUID().toString(),
                 text = comment,
                 userId = userData.value.userId,
-                timestamp = formatted,
+                timestamp = System.currentTimeMillis(),
                 likes = Likes(),
                 additionalImages = additionalImages.apply {
                     additionalImagesComments.forEachIndexed { index, uri ->
@@ -259,7 +277,6 @@ fun ProjectOverview(projectData: Project? = null, blog: Blog? = null) {
                                     "comments",
                                     uploadFile(
                                         "comments",
-                                        userData.value.username!!,
                                         file.readBytes()
                                     ).toString()
                                 )
@@ -276,6 +293,11 @@ fun ProjectOverview(projectData: Project? = null, blog: Blog? = null) {
             onDone()
         }
     }
+
+    var delete by remember { mutableStateOf(false) }
+    var commentToDelete by remember { mutableStateOf(Comment()) }
+    var replyToDelete by remember { mutableStateOf<Comment?>(null) }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -851,8 +873,86 @@ fun ProjectOverview(projectData: Project? = null, blog: Blog? = null) {
                 }
                 item {
                     Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .background(textFieldColor)
+                            .padding(end = 20.dp),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        Image(
+                            painter = painterResource(R.drawable.reviews),
+                            contentDescription = "Reviews",
+                            Modifier
+                                .size(30.dp),
+                            colorFilter = ColorFilter.tint(textColor)
+                        )
+                        Text(
+                            text = formatNumber(
+                                if (projectData != null) projectData.projectData!!.reviews
+                                else blog!!.projectData!!.reviews
+                            ),
+                            fontSize = 12.sp,
+                            modifier = Modifier
+                                .align(Alignment.CenterVertically)
+                                .padding(start = 5.dp),
+                            color = textColor,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Image(
+                            imageVector = if (likes?.users?.contains(
+                                    userData.value.userId
+                                ) == true
+                            ) Icons.Filled.Favorite
+                            else Icons.Outlined.FavoriteBorder,
+                            contentDescription = "Like",
+                            Modifier
+                                .size(30.dp)
+                                .padding(start = 5.dp)
+                                .clickable {
+                                    likes?.let {
+                                        FirebaseDB.sendLikeBlog(
+                                            blog?.projectData!!.projectId.toString(),
+                                            it
+                                        ) { sent, like ->
+                                            likes = like
+                                            likeCount = if (sent) {
+                                                likeCount!! + 1
+
+                                            } else {
+                                                likeCount!! - 1
+
+                                            }
+
+                                        }
+                                    }
+                                },
+                            colorFilter = if (likes?.users?.contains(
+                                    userData.value.userId
+                                ) == true
+                            ) ColorFilter.tint(headers_activeElement)
+                            else ColorFilter.tint(Color.Gray)
+                        )
+                        Text(
+                            text = formatNumber(likeCount!!),
+                            fontSize = 12.sp,
+                            modifier = Modifier
+                                .align(Alignment.CenterVertically)
+                                .padding(start = 5.dp),
+                            color = textColor,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+                item {
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .clickable {
+                                userWatching = author
+                                navController.navigate("userProfile")
+                            }
                             .background(textFieldColor)
                             .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -880,7 +980,7 @@ fun ProjectOverview(projectData: Project? = null, blog: Blog? = null) {
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = date!!,
+                                text = date!!.toDateTimeString(),
                                 fontSize = 12.sp,
                                 color = Color.Gray
                             )
@@ -923,7 +1023,7 @@ fun ProjectOverview(projectData: Project? = null, blog: Blog? = null) {
                         }
                     }
                 }
-                if (projectData != null) {
+                if (projectData?.category == Category.Crocheting) {
                     item {
                         var started by remember { mutableStateOf(context.getString(R.string.started)) }
                         refProjectsInProgress.child(userData.value.userId)
@@ -936,6 +1036,11 @@ fun ProjectOverview(projectData: Project? = null, blog: Blog? = null) {
                             mutableStateOf<ProjectsArchive>(
                                 ProjectsArchive()
                             )
+                        }
+                        FirebaseDB.getProjectInProgress(
+                            projectData.projectData.projectId
+                        ){
+                            project = it
                         }
                         Button(
                             onClick = {
@@ -1012,7 +1117,7 @@ fun ProjectOverview(projectData: Project? = null, blog: Blog? = null) {
                                     Row {
                                         IconButton(onClick = {
                                             if (comment.isNotEmpty()) {
-                                                sendComment() {
+                                                sendComment {
                                                     comment = ""
                                                     additionalImagesComments.clear()
                                                     FirebaseDB.getComments(
@@ -1089,341 +1194,378 @@ fun ProjectOverview(projectData: Project? = null, blog: Blog? = null) {
                         )
                     } else {
 
-                        Column(Modifier.background(textFieldColor).animateContentSize()) {
-                            comments.forEachIndexed { index, comment ->
-                                var toReply by remember { mutableStateOf(false) }
-
-                                val context = LocalContext.current
-                                val scope = rememberCoroutineScope()
-                                var reply by remember { mutableStateOf("") }
-                                var additionalImagesComments =
-                                    remember { mutableStateListOf<String?>() }
-
-                                fun sendReply(onDone: () -> Unit) {
-                                    var additionalImages = mutableListOf<String?>()
-                                    val now = LocalDateTime.now()
-                                    val formatter =
-                                        DateTimeFormatter.ofPattern("HH:mm, dd.MM.yyyy ")
-                                    val formatted = now.format(formatter)
-                                    scope.launch {
-                                        var comment_ = Comment(
-                                            id = UUID.randomUUID().toString(),
-                                            text = reply,
-                                            userId = com.hotelka.knitlyWants.userData.value.userId,
-                                            timestamp = formatted,
-                                            likes = Likes(),
-                                            additionalImages = additionalImages.apply {
-                                                additionalImagesComments.forEachIndexed { index, uri ->
-                                                    var file: File? = null
-                                                    file = getFileFromUri(context, Uri.parse(uri))
-                                                    file?.let { file ->
-                                                        additionalImages.add(
-                                                            getData(
-                                                                "comments",
-                                                                uploadFile(
-                                                                    "comments",
-                                                                    com.hotelka.knitlyWants.userData.value.username!!,
-                                                                    file.readBytes()
-                                                                ).toString()
-                                                            )
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        )
-                                        FirebaseDB.sendCommentReply(
-                                            comment_,
-                                            id.toString(),
-                                            comment.id.toString(),
-                                            if (projectData != null) refProjects else refBlogs
-                                        )
-                                        onDone()
-                                    }
-                                }
-
-                                var user by remember { mutableStateOf<UserData>(UserData()) }
-                                FirebaseDB.getUser(comment.userId.toString()) { user = it }
-                                CommentItem(
-                                    if (projectData != null) projectData else blog,
-                                    postId = id.toString(),
-                                    commentId = comment.id.toString(),
-                                    userData = user,
-                                    commentText = comment.text.toString(),
-                                    timestamp = comment.timestamp.toString(),
-                                    likes = comment.likes,
-                                    additionalImages = comment.additionalImages!!,
-                                    onImageClick = {
-                                        images.apply {
-                                            comment.additionalImages?.let {
-                                                clear(); images.addAll(
-                                                it
-                                            ); imageViewer = true
-                                            }
-                                        }
-                                    }
-                                ) {
-                                   toReply = it
-
-                                }
-                                if (toReply) {
-                                    Column(Modifier.background(textFieldColor).padding(bottom = 5.dp)) {
-                                        val launcher =
-                                            rememberLauncherForActivityResult(contract = ActivityResultContracts.GetContent()) { uri ->
-                                                uri?.let { additionalImagesComments.add(it.toString()) }
-                                            }
-                                        Row(
-                                            Modifier
-                                                .padding(top = 5.dp)
-                                                .fillMaxWidth()
-                                        ) {
-                                            AsyncImage(
-                                                model = if (userData.value.profilePictureUrl != "") userData.value.profilePictureUrl
-                                                else R.drawable.baseline_account_circle_24,
-                                                contentDescription = null,
-                                                modifier = Modifier
-                                                    .size(40.dp)
-                                                    .clip(CircleShape)
-                                                    .align(Alignment.Top),
-                                                contentScale = ContentScale.Crop
-
-                                            )
-                                            Spacer(Modifier.width(8.dp))
-                                            TextField(
-                                                value = reply,
-                                                onValueChange = { reply = it },
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .clip(
-                                                        RoundedCornerShape(
-                                                            topEnd = 20.dp,
-                                                            topStart = 20.dp
-                                                        )
-                                                    ),
-                                                textStyle = TextStyle(fontSize = 16.sp),
-                                                label = { Text(text = stringResource(R.string.leaveComment)) },
-                                                colors = TextFieldDefaults.colors(
-                                                    focusedContainerColor = white,
-                                                    unfocusedContainerColor = white,
-                                                    focusedTextColor = textColor,
-                                                    unfocusedTextColor = textColor,
-                                                    focusedLabelColor = textColor,
-                                                    unfocusedLabelColor = textColor
-                                                ),
-                                                trailingIcon = {
-                                                    Row {
-                                                        IconButton(onClick = {
-                                                            if (reply.isNotEmpty()) {
-                                                                sendReply {
-                                                                    reply = ""
-                                                                    additionalImagesComments.clear()
-                                                                    FirebaseDB.getComments(
-                                                                        if (projectData != null) refProjects else refBlogs,
-                                                                        id.toString()
-                                                                    ) { comments = it }
-                                                                }
-                                                            }
-                                                        }) {
-                                                            Icon(
-                                                                imageVector = Icons.AutoMirrored.Filled.Send,
-                                                                contentDescription = null,
-                                                                tint = if (reply.isNotEmpty()) headers_activeElement else Color.Gray
-                                                            )
-                                                        }
-
-                                                        IconButton(onClick = {
-                                                            launcher.launch("image/*")
-                                                        }) {
-                                                            Icon(
-                                                                imageVector = ImageVector.vectorResource(
-                                                                    R.drawable.attach
-                                                                ),
-                                                                contentDescription = null,
-                                                                tint = headers_activeElement
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                            )
-                                        }
-                                        LazyRow(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .heightIn(0.dp, 200.dp)
-                                        ) {
-                                            itemsIndexed(additionalImagesComments) { index, uri ->
-                                                AsyncImage(
-                                                    model = uri,
-                                                    modifier = Modifier
-                                                        .padding(start = 8.dp)
-                                                        .fillMaxSize()
-                                                        .padding(10.dp)
-                                                        .clip(
-                                                            RoundedCornerShape(
-                                                                20.dp
-                                                            )
-                                                        )
-                                                        .combinedClickable(
-                                                            onClick = {},
-                                                            onLongClick = {
-                                                                additionalImagesComments.removeAt(
-                                                                    index
-                                                                )
-                                                            }
-                                                        ),
-                                                    contentScale = ContentScale.FillWidth,
-                                                    contentDescription = "Comment Image"
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                                comment.replies!!.values.forEach { comment ->
+                        Column(
+                            Modifier
+                                .background(textFieldColor)
+                                .animateContentSize()
+                        ) {
+                            comments.sortedByDescending { it.timestamp }
+                                .forEachIndexed { index, comment ->
                                     var toReply by remember { mutableStateOf(false) }
 
-                                    Column(
-                                        modifier = Modifier
-                                            .padding(start = 40.dp)
-                                            .animateContentSize()
-                                    ) {
-                                        var user by remember { mutableStateOf<UserData>(UserData()) }
-                                        FirebaseDB.getUser(comment.userId.toString()) {
-                                            user = it
-                                        }
-                                        CommentItem(
-                                            postType = if (projectData != null) refProjects else refBlogs,
-                                            postId = id.toString(),
-                                            commentId = comment.id!!,
-                                            userData = user,
-                                            commentText = comment.text!!,
-                                            timestamp = comment.timestamp.toString(),
-                                            likes = comment.likes,
-                                            additionalImages = comment.additionalImages!!,
-                                            onImageClick = {
-                                                images.apply {
-                                                    comment.additionalImages?.let {
-                                                        clear(); images.addAll(
-                                                        it
-                                                    ); imageViewer = true
+                                    val context = LocalContext.current
+                                    val scope = rememberCoroutineScope()
+                                    var reply by remember { mutableStateOf("") }
+                                    var additionalImagesComments =
+                                        remember { mutableStateListOf<String?>() }
+
+                                    fun sendReply(onDone: () -> Unit) {
+                                        var additionalImages = mutableListOf<String?>()
+                                        scope.launch {
+                                            var comment_ = Comment(
+                                                id = UUID.randomUUID().toString(),
+                                                text = reply,
+                                                userId = userData.value.userId,
+                                                timestamp = System.currentTimeMillis(),
+                                                likes = Likes(),
+                                                additionalImages = additionalImages.apply {
+                                                    additionalImagesComments.forEachIndexed { index, uri ->
+                                                        var file: File? = null
+                                                        file =
+                                                            getFileFromUri(context, Uri.parse(uri))
+                                                        file?.let { file ->
+                                                            additionalImages.add(
+                                                                getData(
+                                                                    "comments",
+                                                                    uploadFile(
+                                                                        "comments",
+                                                                        file.readBytes()
+                                                                    ).toString()
+                                                                )
+                                                            )
+                                                        }
                                                     }
+                                                }
+                                            )
+                                            FirebaseDB.sendCommentReply(
+                                                comment_,
+                                                id.toString(),
+                                                comment.id.toString(),
+                                                if (projectData != null) refProjects else refBlogs
+                                            )
+                                            onDone()
+                                        }
+                                    }
+
+                                    var user by remember { mutableStateOf<UserData>(UserData()) }
+                                    FirebaseDB.getUser(comment.userId.toString()) { user = it }
+                                    CommentItem(
+                                        postType = if (projectData != null) projectData else blog,
+                                        postId = id.toString(),
+                                        commentId = comment.id.toString(),
+                                        userData = user,
+                                        commentText = comment.text.toString(),
+                                        timestamp = comment.timestamp!!.toDateTimeString(),
+                                        likes = comment.likes,
+                                        additionalImages = comment.additionalImages!!,
+                                        onImageClick = {
+                                            images.apply {
+                                                comment.additionalImages?.let {
+                                                    clear(); images.addAll(
+                                                    it
+                                                ); imageViewer = true
                                                 }
                                             }
+                                        },
+                                        callDelete = { delete = true; commentToDelete = comment },
+                                        onReply = { toReply = it }
+                                    )
+                                    if (toReply) {
+                                        Column(
+                                            Modifier
+                                                .background(textFieldColor)
+                                                .padding(bottom = 5.dp)
                                         ) {
-                                            toReply = it
-                                        }
-                                        if (toReply) {
-                                            Column(Modifier.background(textFieldColor).padding(bottom = 5.dp)) {
-                                                val launcher =
-                                                    rememberLauncherForActivityResult(contract = ActivityResultContracts.GetContent()) { uri ->
-                                                        uri?.let { additionalImagesComments.add(it.toString()) }
-                                                    }
-                                                Row(
-                                                    Modifier
-                                                        .fillMaxWidth()
-                                                ) {
-                                                    AsyncImage(
-                                                        model = if (userData.value.profilePictureUrl != "") userData.value.profilePictureUrl
-                                                        else R.drawable.baseline_account_circle_24,
-                                                        contentDescription = null,
-                                                        modifier = Modifier
-                                                            .size(40.dp)
-                                                            .clip(CircleShape)
-                                                            .align(Alignment.Top),
-                                                        contentScale = ContentScale.Crop
-
-                                                    )
-                                                    Spacer(Modifier.width(8.dp))
-
-                                                    TextField(
-                                                        value = reply,
-                                                        onValueChange = { reply = it },
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .clip(
-                                                                RoundedCornerShape(
-                                                                    topEnd = 20.dp,
-                                                                    topStart = 20.dp
-                                                                )
-                                                            ),
-                                                        textStyle = TextStyle(fontSize = 16.sp),
-                                                        label = { Text(text = stringResource(R.string.leaveComment)) },
-                                                        colors = TextFieldDefaults.colors(
-                                                            focusedContainerColor = white,
-                                                            unfocusedContainerColor = white,
-                                                            focusedTextColor = textColor,
-                                                            unfocusedTextColor = textColor,
-                                                            focusedLabelColor = textColor,
-                                                            unfocusedLabelColor = textColor
-                                                        ),
-                                                        trailingIcon = {
-                                                            Row {
-                                                                IconButton(onClick = {
-                                                                    if (reply.isNotEmpty()) {
-                                                                        sendReply {
-                                                                            reply = ""
-                                                                            additionalImagesComments.clear()
-                                                                            FirebaseDB.getComments(
-                                                                                if (projectData != null) refProjects else refBlogs,
-                                                                                id.toString()
-                                                                            ) { comments = it }
-                                                                        }
-                                                                    }
-                                                                }) {
-                                                                    Icon(
-                                                                        imageVector = Icons.AutoMirrored.Filled.Send,
-                                                                        contentDescription = null,
-                                                                        tint = if (reply.isNotEmpty()) headers_activeElement else Color.Gray
-                                                                    )
-                                                                }
-
-                                                                IconButton(onClick = {
-                                                                    launcher.launch("image/*")
-                                                                }) {
-                                                                    Icon(
-                                                                        imageVector = ImageVector.vectorResource(
-                                                                            R.drawable.attach
-                                                                        ),
-                                                                        contentDescription = null,
-                                                                        tint = headers_activeElement
-                                                                    )
-                                                                }
-                                                            }
-                                                        }
-                                                    )
+                                            val launcher =
+                                                rememberLauncherForActivityResult(contract = ActivityResultContracts.GetContent()) { uri ->
+                                                    uri?.let { additionalImagesComments.add(it.toString()) }
                                                 }
-                                                LazyRow(
+                                            Row(
+                                                Modifier
+                                                    .padding(top = 5.dp)
+                                                    .fillMaxWidth()
+                                            ) {
+                                                AsyncImage(
+                                                    model = if (userData.value.profilePictureUrl != "") userData.value.profilePictureUrl
+                                                    else R.drawable.baseline_account_circle_24,
+                                                    contentDescription = null,
+                                                    modifier = Modifier
+                                                        .size(40.dp)
+                                                        .clip(CircleShape)
+                                                        .align(Alignment.Top),
+                                                    contentScale = ContentScale.Crop
+
+                                                )
+                                                Spacer(Modifier.width(8.dp))
+                                                TextField(
+                                                    value = reply,
+                                                    onValueChange = { reply = it },
                                                     modifier = Modifier
                                                         .fillMaxWidth()
-                                                        .heightIn(0.dp, 200.dp)
-                                                ) {
-                                                    itemsIndexed(additionalImagesComments) { index, uri ->
-                                                        AsyncImage(
-                                                            model = uri,
-                                                            modifier = Modifier
-                                                                .fillMaxSize()
-                                                                .padding(10.dp)
-                                                                .clip(
-                                                                    RoundedCornerShape(
-                                                                        20.dp
-                                                                    )
-                                                                )
-                                                                .combinedClickable(
-                                                                    onClick = {},
-                                                                    onLongClick = {
-                                                                        additionalImagesComments.removeAt(
-                                                                            index
-                                                                        )
+                                                        .clip(
+                                                            RoundedCornerShape(
+                                                                topEnd = 20.dp,
+                                                                topStart = 20.dp
+                                                            )
+                                                        ),
+                                                    textStyle = TextStyle(fontSize = 16.sp),
+                                                    label = { Text(text = stringResource(R.string.leaveComment)) },
+                                                    colors = TextFieldDefaults.colors(
+                                                        focusedContainerColor = white,
+                                                        unfocusedContainerColor = white,
+                                                        focusedTextColor = textColor,
+                                                        unfocusedTextColor = textColor,
+                                                        focusedLabelColor = textColor,
+                                                        unfocusedLabelColor = textColor
+                                                    ),
+                                                    trailingIcon = {
+                                                        Row {
+                                                            IconButton(onClick = {
+                                                                if (reply.isNotEmpty()) {
+                                                                    sendReply {
+                                                                        keyboard?.hide()
+                                                                        toReply = false
+                                                                        reply = ""
+                                                                        additionalImagesComments.clear()
+                                                                        FirebaseDB.getComments(
+                                                                            if (projectData != null) refProjects else refBlogs,
+                                                                            id.toString()
+                                                                        ) { comments = it }
                                                                     }
-                                                                ),
-                                                            contentScale = ContentScale.FillWidth,
-                                                            contentDescription = "Comment Image"
-                                                        )
+                                                                }
+                                                            }) {
+                                                                Icon(
+                                                                    imageVector = Icons.AutoMirrored.Filled.Send,
+                                                                    contentDescription = null,
+                                                                    tint = if (reply.isNotEmpty()) headers_activeElement else Color.Gray
+                                                                )
+                                                            }
+
+                                                            IconButton(onClick = {
+                                                                launcher.launch("image/*")
+                                                            }) {
+                                                                Icon(
+                                                                    imageVector = ImageVector.vectorResource(
+                                                                        R.drawable.attach
+                                                                    ),
+                                                                    contentDescription = null,
+                                                                    tint = headers_activeElement
+                                                                )
+                                                            }
+                                                        }
                                                     }
+                                                )
+                                            }
+                                            LazyRow(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .heightIn(0.dp, 200.dp)
+                                            ) {
+                                                itemsIndexed(additionalImagesComments) { index, uri ->
+                                                    AsyncImage(
+                                                        model = uri,
+                                                        modifier = Modifier
+                                                            .padding(start = 8.dp)
+                                                            .fillMaxSize()
+                                                            .padding(10.dp)
+                                                            .clip(
+                                                                RoundedCornerShape(
+                                                                    20.dp
+                                                                )
+                                                            )
+                                                            .combinedClickable(
+                                                                onClick = {},
+                                                                onLongClick = {
+                                                                    additionalImagesComments.removeAt(
+                                                                        index
+                                                                    )
+                                                                }
+                                                            ),
+                                                        contentScale = ContentScale.FillWidth,
+                                                        contentDescription = "Comment Image"
+                                                    )
                                                 }
                                             }
                                         }
                                     }
+                                    comment.replies!!.values.sortedBy { it.timestamp }
+                                        .forEach { replyComment ->
+                                            var toReply by remember { mutableStateOf(false) }
+
+                                            Column(
+                                                modifier = Modifier
+                                                    .padding(start = 40.dp)
+                                                    .animateContentSize()
+                                            ) {
+                                                var user by remember {
+                                                    mutableStateOf<UserData>(
+                                                        UserData()
+                                                    )
+                                                }
+                                                FirebaseDB.getUser(replyComment.userId.toString()) {
+                                                    user = it
+                                                }
+                                                CommentItem(
+                                                    parentCommentId = comment.id.toString(),
+                                                    isReply = true,
+                                                    postType = if (projectData != null) projectData else blog,
+                                                    postId = id.toString(),
+                                                    commentId = replyComment.id!!,
+                                                    userData = user,
+                                                    commentText = replyComment.text!!,
+                                                    timestamp = replyComment.timestamp!!.toDateTimeString(),
+                                                    likes = replyComment.likes,
+                                                    additionalImages = replyComment.additionalImages!!,
+                                                    onImageClick = {
+                                                        images.apply {
+                                                            replyComment.additionalImages?.let {
+                                                                clear(); images.addAll(
+                                                                it
+                                                            ); imageViewer = true
+                                                            }
+                                                        }
+                                                    },
+                                                    callDelete = {
+                                                        delete = true; commentToDelete =
+                                                        comment; replyToDelete = replyComment
+                                                    },
+                                                    onReply = { toReply = it }
+                                                )
+                                                if (toReply) {
+                                                    Column(
+                                                        Modifier
+                                                            .background(textFieldColor)
+                                                            .padding(bottom = 5.dp)
+                                                    ) {
+                                                        val launcher =
+                                                            rememberLauncherForActivityResult(
+                                                                contract = ActivityResultContracts.GetContent()
+                                                            ) { uri ->
+                                                                uri?.let {
+                                                                    additionalImagesComments.add(
+                                                                        it.toString()
+                                                                    )
+                                                                }
+                                                            }
+                                                        Row(
+                                                            Modifier
+                                                                .fillMaxWidth()
+                                                        ) {
+                                                            AsyncImage(
+                                                                model = if (userData.value.profilePictureUrl != "") userData.value.profilePictureUrl
+                                                                else R.drawable.baseline_account_circle_24,
+                                                                contentDescription = null,
+                                                                modifier = Modifier
+                                                                    .size(40.dp)
+                                                                    .clip(CircleShape)
+                                                                    .align(Alignment.Top),
+                                                                contentScale = ContentScale.Crop
+
+                                                            )
+                                                            Spacer(Modifier.width(8.dp))
+
+                                                            TextField(
+                                                                value = reply,
+                                                                onValueChange = { reply = it },
+                                                                modifier = Modifier
+                                                                    .fillMaxWidth()
+                                                                    .clip(
+                                                                        RoundedCornerShape(
+                                                                            topEnd = 20.dp,
+                                                                            topStart = 20.dp
+                                                                        )
+                                                                    ),
+                                                                textStyle = TextStyle(fontSize = 16.sp),
+                                                                label = {
+                                                                    Text(
+                                                                        text = stringResource(
+                                                                            R.string.leaveComment
+                                                                        )
+                                                                    )
+                                                                },
+                                                                colors = TextFieldDefaults.colors(
+                                                                    focusedContainerColor = white,
+                                                                    unfocusedContainerColor = white,
+                                                                    focusedTextColor = textColor,
+                                                                    unfocusedTextColor = textColor,
+                                                                    focusedLabelColor = textColor,
+                                                                    unfocusedLabelColor = textColor
+                                                                ),
+                                                                trailingIcon = {
+                                                                    Row {
+                                                                        IconButton(onClick = {
+                                                                            if (reply.isNotEmpty()) {
+                                                                                keyboard?.hide()
+                                                                                toReply = false
+                                                                                sendReply {
+                                                                                    reply = ""
+                                                                                    additionalImagesComments.clear()
+                                                                                    FirebaseDB.getComments(
+                                                                                        if (projectData != null) refProjects else refBlogs,
+                                                                                        id.toString()
+                                                                                    ) {
+                                                                                        comments =
+                                                                                            it
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                        }) {
+                                                                            Icon(
+                                                                                imageVector = Icons.AutoMirrored.Filled.Send,
+                                                                                contentDescription = null,
+                                                                                tint = if (reply.isNotEmpty()) headers_activeElement else Color.Gray
+                                                                            )
+                                                                        }
+
+                                                                        IconButton(onClick = {
+                                                                            launcher.launch("image/*")
+                                                                        }) {
+                                                                            Icon(
+                                                                                imageVector = ImageVector.vectorResource(
+                                                                                    R.drawable.attach
+                                                                                ),
+                                                                                contentDescription = null,
+                                                                                tint = headers_activeElement
+                                                                            )
+                                                                        }
+                                                                    }
+                                                                }
+                                                            )
+                                                        }
+                                                        LazyRow(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .heightIn(0.dp, 200.dp)
+                                                        ) {
+                                                            itemsIndexed(additionalImagesComments) { index, uri ->
+                                                                AsyncImage(
+                                                                    model = uri,
+                                                                    modifier = Modifier
+                                                                        .fillMaxSize()
+                                                                        .padding(10.dp)
+                                                                        .clip(
+                                                                            RoundedCornerShape(
+                                                                                20.dp
+                                                                            )
+                                                                        )
+                                                                        .combinedClickable(
+                                                                            onClick = {},
+                                                                            onLongClick = {
+                                                                                additionalImagesComments.removeAt(
+                                                                                    index
+                                                                                )
+                                                                            }
+                                                                        ),
+                                                                    contentScale = ContentScale.FillWidth,
+                                                                    contentDescription = "Comment Image"
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
                                 }
-                            }
                         }
                     }
                 }
@@ -1433,9 +1575,113 @@ fun ProjectOverview(projectData: Project? = null, blog: Blog? = null) {
 
             }
         }
-        if (loading) LoadingAnimation()
-        if (imageViewer) ImageViewer(images.toList(), startIndex = startIndex)
+        if (loading) {
+            LoadingAnimation()
+        }
+        AnimatedVisibility(
+            visible = imageViewer,
+            enter = slideInVertically(
+                initialOffsetY = {
+                    it / 2
+                },
+            ),
+            exit = slideOutVertically(
+                targetOffsetY = {
+                    it / 2
+                },
+            ),
+        ) {
+            ImageViewer(images.toList(), startIndex = startIndex) { imageViewer = false }
+        }
+
+
+        if (delete) DeleteComment(onCancel = { delete = false }) {
+            if (replyToDelete != null) {
+                FirebaseDB.deleteCommentReply(
+                    comment = commentToDelete,
+                    typeDbRef = if (projectData != null) refProjects else refBlogs,
+                    replyId = replyToDelete!!.id.toString(),
+                    id = if (projectData != null) projectData.projectData?.projectId.toString() else blog?.projectData?.projectId.toString()
+                ) {
+                    FirebaseDB.getComments(
+                        if (projectData != null) refProjects else refBlogs,
+                        id.toString()
+                    ) { comments = it }
+                }
+                replyToDelete = null
+            } else {
+                FirebaseDB.deleteComment(
+                    comment = commentToDelete,
+                    typeDbRef = if (projectData != null) refProjects else refBlogs,
+                    id = if (projectData != null) projectData.projectData?.projectId.toString() else blog?.projectData?.projectId.toString()
+                ) {
+                    FirebaseDB.getComments(
+                        if (projectData != null) refProjects else refBlogs,
+                        id.toString()
+                    ) { comments = it }
+                }
+            }
+        }
 
     }
 
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DeleteComment(onCancel: () -> Unit, onDelete: () -> Unit) {
+    BasicAlertDialog(
+        onDismissRequest = { onCancel() }
+    ) {
+        Surface(
+            modifier = Modifier
+                .wrapContentWidth()
+                .wrapContentHeight(),
+            shape = MaterialTheme.shapes.large
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = stringResource(R.string.deleteComment),
+                    modifier = Modifier
+                        .padding(10.dp)
+                        .fillMaxWidth(),
+                    fontSize = 18.sp,
+                    color = textColor
+
+                )
+
+
+                Row(
+                    Modifier.wrapContentSize(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Button(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = headers_activeElement),
+                        onClick = {
+                            onCancel()
+                        }
+                    ) {
+                        Text(stringResource(R.string.cancel))
+
+                    }
+                    Button(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = headers_activeElement),
+                        onClick = {
+                            onDelete()
+                            onCancel()
+                        }
+                    ) {
+                        Text(stringResource(R.string.delete))
+
+                    }
+                }
+            }
+        }
+    }
 }

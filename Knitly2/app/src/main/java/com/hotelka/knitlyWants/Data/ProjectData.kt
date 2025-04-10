@@ -2,6 +2,7 @@ package com.hotelka.knitlyWants.Data
 
 import androidx.compose.ui.graphics.Color
 import com.hotelka.knitlyWants.nav.StitchType
+import java.security.Timestamp
 
 data class CellData(
     val stitchType: StitchType? = StitchType.None,
@@ -49,27 +50,26 @@ data class Detail(var title: String? = "", var rows: MutableList<RowCrochet> = m
 data class ProjectData(
     val projectId: String? = "",
     val title: String? = "",
-    val date: String = "01.01.1999",
+    val date: Long? = 0L,
     val description: String = "Description",
-    val author: String? = "",
     var authorID: String? = "",
     var reviews: Int = 0,
     var likes: Likes = Likes(),
     val cover: String? = ""
-) {}
+)
 
 data class Comment(
     val id: String? = "",
     val text: String? = "",
     val userId: String? = "",
-    val timestamp: String? = "",
+    val timestamp: Long? = 0L,
     var likes: Likes = Likes(),
     var additionalImages: MutableList<String?>? = mutableListOf(),
     var replies: MutableMap<String, Comment>? = LinkedHashMap(),
 )
 data class Likes(
     var total: Int? = 0,
-    var users: List<String>? = listOf()
+    var users: HashMap<String, Boolean>? = LinkedHashMap()
 )
 
 data class Project(
@@ -97,11 +97,14 @@ data class Chat(
     var messages: Map<String, Message> = LinkedHashMap(),
 )
 data class Message(
+    var messageReplyTo: String? = "",
+    var replyTo: String? = "",
     var id: String? = "",
-    var user: UserData = UserData(),
+    var user: String? = "",
     var text: String? = "",
     var additionalImages: MutableList<String> = mutableListOf(),
     var time: Long = 0L,
-    var isChecked: Boolean = false
+    var isChecked: Boolean = false,
+    var edited: Boolean? = false,
 
 )

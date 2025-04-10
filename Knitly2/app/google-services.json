@@ -23,6 +23,22 @@
           }
         },
         {
+          "client_id": "464389724786-rr0coifjbdpjqcjk53nmatp06qfb43sd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.hotelka.knitlyWants",
+            "certificate_hash": "8a677edbd2b58d4fcb05dff7cab37eba0463f83f"
+          }
+        },
+        {
+          "client_id": "464389724786-u491baopaq1954p74fjag0g3nhnfuhfj.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.hotelka.knitlyWants",
+            "certificate_hash": "646a01c0c8a4d81249f9ce35499f8c33c95b2e1e"
+          }
+        },
+        {
           "client_id": "464389724786-lm806jqrkfbjju85vsnlkudc66k5dr5n.apps.googleusercontent.com",
           "client_type": 3
         }

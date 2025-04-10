@@ -112,17 +112,17 @@ fun EditProfile() {
     }
     fun usernameNotAvailable(usernameWanted: String): Boolean {
         isUserExist = false
-        FirebaseDB.refUsers.get().addOnSuccessListener {
+        refUsers.get().addOnSuccessListener {
             it.children.forEach { user ->
                 val username = user.getValue<UserData>(UserData::class.java)?.username.toString()
-                if (usernameWanted.replace(" ", "").contains(username)) isUserExist = true
+                if (usernameWanted.replace(" ", "") == username) isUserExist = true
             }
         }
         return isUserExist
     }
 
     fun usernameError(usernameWanted: String) {
-        if (usernameWanted.length < 5 || usernameWanted.length > 17) {
+        if (usernameWanted.length < 5  || usernameWanted.length > 17) {
             usernameError.value = true
         }
     }
@@ -269,7 +269,7 @@ fun EditProfile() {
                         focusedContainerColor = secondary,
                         unfocusedContainerColor = textFieldColor
                     ),
-                    isError = isUserExist || usernameError.value,
+                    isError = isUserExist,
                     trailingIcon = {
                         if (usernameError.value) {
                             Icon(
@@ -288,43 +288,42 @@ fun EditProfile() {
                 )
 
                 Spacer(modifier = Modifier.height(15.dp))
-
                 TextField(
-                    singleLine = true,
-                    value = name.value,
-                    onValueChange = {
-                        name.value = it
-                        nameError.value = false
-                        nameRequired()
-                    },
-                    label = {
-                        val additional =
-                            if (usernameError.value) "*${stringResource(R.string.required)}" else ""
-                        Text(stringResource(R.string.name) + additional)
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp)),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = secondary,
-                        unfocusedContainerColor = textFieldColor
-                    ),
-                    isError = nameError.value,
-                    trailingIcon = {
-                        if (nameError.value) {
-                            Icon(
-                                imageVector = Icons.Filled.Info,
-                                contentDescription = "error",
-                                tint = error
-                            )
-                        }
-                    },
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                    keyboardActions = KeyboardActions(
-                        onNext = {
-                            focusManager.moveFocus(FocusDirection.Down)
-                        }
-                    )
+                        singleLine = true,
+                value = name.value,
+                onValueChange = {
+                    name.value = it
+                    nameError.value = false
+                    nameRequired()
+                },
+                label = {
+                    val additional =
+                        if (usernameError.value) "*${stringResource(R.string.required)}" else ""
+                    Text(stringResource(R.string.name) + additional)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp)),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = secondary,
+                    unfocusedContainerColor = textFieldColor
+                ),
+                isError = nameError.value,
+                trailingIcon = {
+                    if (nameError.value) {
+                        Icon(
+                            imageVector = Icons.Filled.Info,
+                            contentDescription = "error",
+                            tint = error
+                        )
+                    }
+                },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(
+                    onNext = {
+                        focusManager.moveFocus(FocusDirection.Down)
+                    }
+                )
                 )
                 Spacer(modifier = Modifier.height(15.dp))
 
@@ -348,18 +347,17 @@ fun EditProfile() {
                     )
                 )
                 Spacer(modifier = Modifier.height(15.dp))
-
                 TextField(
-                    value = bio.value,
-                    onValueChange = { bio.value = it },
-                    label = { Text(stringResource(R.string.bio)) },
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .fillMaxWidth(),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = secondary,
-                        unfocusedContainerColor = textFieldColor
-                    )
+                        value = bio.value,
+                onValueChange = { bio.value = it },
+                label = { Text(stringResource(R.string.bio)) },
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .fillMaxWidth(),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = secondary,
+                    unfocusedContainerColor = textFieldColor
+                )
                 )
                 Spacer(modifier = Modifier.height(24.dp))
                 Box(modifier = Modifier
@@ -378,14 +376,13 @@ fun EditProfile() {
                                 map["lastName"] = lastName.value
                                 map["bio"] = bio.value
                                 composableScope.launch {
-                                    map["profilePictureUrl"] = getData(
+                                    map["profilePictureUrl"] = if (imageBitmap != null) getData(
                                         "avatars",
                                         uploadFile(
                                             "avatars",
-                                            userData.value.username!!,
                                             imageBitmapToByteArray(imageBitmap!!)
                                         ).toString()
-                                    )
+                                    ) else ""
 
                                     FirebaseDB.updateUser(map)
                                 }

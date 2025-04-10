@@ -15,5 +15,4 @@ data class UserData(
     var subscriptions: List<String>? = listOf(),
     var chats: List<String> = listOf(),
     var isOnline: Boolean = false,
-    var token: String? = ""
     )

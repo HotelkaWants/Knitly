@@ -10,16 +10,11 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
-private val DarkColorScheme = darkColorScheme(
-    primary = basic,
-    secondary = secondary,
-    tertiary = headers_activeElement
-)
 
 private val LightColorScheme = lightColorScheme(
-    primary = basic,
-    secondary = secondary,
-    tertiary = headers_activeElement
+    primary = textColor,
+    secondary = textColor,
+    tertiary = textColor,
 
     /* Other default colors to override
     background = Color(0xFFFFFBFE),
@@ -36,7 +31,7 @@ private val LightColorScheme = lightColorScheme(
 fun KnitlyTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
@@ -45,7 +40,7 @@ fun KnitlyTheme(
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
 
-        darkTheme -> DarkColorScheme
+        darkTheme -> LightColorScheme
         else -> LightColorScheme
     }
 

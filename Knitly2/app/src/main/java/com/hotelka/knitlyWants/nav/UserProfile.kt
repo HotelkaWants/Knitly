@@ -1,5 +1,6 @@
 package com.hotelka.knitlyWants.nav
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -12,9 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -41,11 +40,13 @@ import coil3.compose.AsyncImage
 import com.hotelka.knitlyWants.Cards.BlogCard
 import com.hotelka.knitlyWants.Cards.ExpandedProjectCard
 import com.hotelka.knitlyWants.Data.Blog
+import com.hotelka.knitlyWants.Data.Chat
 import com.hotelka.knitlyWants.Data.Project
 import com.hotelka.knitlyWants.Data.UserData
 import com.hotelka.knitlyWants.FirebaseUtils.BLOGS
 import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB
 import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB.Companion.refBlogs
+import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB.Companion.refChats
 import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB.Companion.refProjects
 import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB.Companion.refUsers
 import com.hotelka.knitlyWants.FirebaseUtils.PROJECTS
@@ -87,7 +88,6 @@ fun UserProfile(user: UserData) {
 
         }
     }
-
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -149,24 +149,27 @@ fun UserProfile(user: UserData) {
                 ) {
                     Button(
                         onClick = {
-                            var exist = false
-                            var chatId = ""
-                            user.chats.forEach {
-                                if (userData.value.chats.contains(it)) {
-                                    exist = true; chatId = it
-                                }
-                            }
-                            if (!exist) {
-                                FirebaseDB.createChat(user) {
-                                    chatOpened = it
-                                    navController.navigate("chat")
-                                }
-                            } else {
-                                FirebaseDB.getChat(chatId) {
-                                    chatOpened = it
-                                    navController.navigate("chat")
-                                }
 
+                            var notExist = false
+                            refChats.get().addOnSuccessListener {
+                                it.children.forEachIndexed { index, child ->
+                                    var chat = child.getValue(Chat::class.java)
+                                    if (chat?.users!!.contains(userData.value.userId) && chat.users.contains(
+                                            user.userId
+                                        )
+                                    ) {
+                                        chatOpened = chat
+                                        navController.navigate("chat")
+                                        notExist = false
+                                    }
+                                    if (index == it.children.toList().size - 1 && chatOpened == null){
+                                        FirebaseDB.createChat(user.userId) {
+                                            userData.value.chats += it.id!!
+                                            chatOpened = it
+                                            navController.navigate("chat")
+                                        }
+                                    }
+                                }
                             }
                         },
                         modifier = Modifier
@@ -231,7 +234,8 @@ fun UserProfile(user: UserData) {
                     horizontalArrangement = Arrangement.Start
 
                 ) {
-                    items(usersProjects) { project ->
+
+                    itemsIndexed(usersProjects) { index, project ->
                         ExpandedProjectCard(project, user)
 
                     }

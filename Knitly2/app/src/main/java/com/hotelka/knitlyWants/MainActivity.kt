@@ -1,7 +1,6 @@
 package com.hotelka.knitlyWants
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -23,17 +22,19 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -70,7 +71,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.view.WindowCompat
 import androidx.credentials.CredentialManager
@@ -78,9 +81,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import coil3.compose.AsyncImage
-import coil3.compose.rememberAsyncImagePainter
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
@@ -88,7 +91,6 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.hotelka.knitlyWants.Auth.RegisterActivity
-import com.hotelka.knitlyWants.Cards.CreateTutorial
 import com.hotelka.knitlyWants.Data.Blog
 import com.hotelka.knitlyWants.Data.Chat
 import com.hotelka.knitlyWants.Data.Project
@@ -97,7 +99,6 @@ import com.hotelka.knitlyWants.Data.UserData
 import com.hotelka.knitlyWants.FirebaseUtils.CHILD_USERS
 import com.hotelka.knitlyWants.FirebaseUtils.FirebaseAuthenticationHelper
 import com.hotelka.knitlyWants.FirebaseUtils.FirebaseDB
-import com.hotelka.knitlyWants.FirebaseUtils.FirebaseMessageReceiver
 import com.hotelka.knitlyWants.Supbase.key
 import com.hotelka.knitlyWants.Supbase.url
 import com.hotelka.knitlyWants.SupportingDatabase.SupportingDatabase
@@ -106,6 +107,7 @@ import com.hotelka.knitlyWants.nav.CreateProjectScreen
 import com.hotelka.knitlyWants.nav.CurrentUserProfileScreen
 import com.hotelka.knitlyWants.nav.DashBoard
 import com.hotelka.knitlyWants.nav.EditProfile
+import com.hotelka.knitlyWants.nav.FansAndFriends
 import com.hotelka.knitlyWants.nav.HomeScreen
 import com.hotelka.knitlyWants.nav.NotificationsAndChats
 import com.hotelka.knitlyWants.nav.ProjectOverview
@@ -157,18 +159,21 @@ class MainActivity : ComponentActivity() {
                     startActivity(Intent(this@MainActivity, RegisterActivity::class.java))
                     finish()
                 } else {
-                    if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS)
-                        != PackageManager.PERMISSION_GRANTED) {
+                    if (ActivityCompat.checkSelfPermission(
+                            this,
+                            android.Manifest.permission.POST_NOTIFICATIONS
+                        )
+                        != PackageManager.PERMISSION_GRANTED
+                    ) {
 
                         ActivityCompat.requestPermissions(
                             this,
                             arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
                             101
-                        );
+                        )
                     }
                     LaunchedEffect(Unit) {
                         getUser()
-                        FirebaseDB.sendToken()
                     }
                     users =
                         remember { mutableStateOf(SupportingDatabase(baseContext).getAllUsers()) }
@@ -186,17 +191,18 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        var prefs = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
-        val id = prefs.getString("idSelected", firebaseAuth.currentUser!!.uid)
+        var prefs = getSharedPreferences("Prefs", MODE_PRIVATE)
+        val id = prefs.getString("idSelected", firebaseAuth.currentUser?.uid)
         FirebaseDB.isOnlineSend(true, id.toString())
     }
 
     override fun onPause() {
         super.onPause()
-        FirebaseDB.isOnlineSend(false, firebaseAuth.currentUser!!.uid)
+        firebaseAuth.currentUser?.let { FirebaseDB.isOnlineSend(false, it.uid) }
     }
+
     fun getUser() {
-        var prefs = getSharedPreferences("Prefs", Context.MODE_PRIVATE)
+        var prefs = getSharedPreferences("Prefs", MODE_PRIVATE)
         val id = prefs.getString("idSelected", firebaseAuth.currentUser!!.uid)
         FirebaseDatabase.getInstance().getReference().child(CHILD_USERS)
             .child(id.toString())
@@ -212,6 +218,9 @@ class MainActivity : ComponentActivity() {
     }
 
     fun HandleLogOut() {
+        var prefs = getSharedPreferences("Prefs", MODE_PRIVATE)
+        val id = prefs.getString("idSelected", firebaseAuth.currentUser!!.uid)
+        FirebaseDB.isOnlineSend(false, id.toString())
         lifecycleScope.launch {
             FirebaseAuthenticationHelper.signOutGoogle(
                 CredentialManager.create(this@MainActivity),
@@ -230,7 +239,7 @@ class MainActivity : ComponentActivity() {
         NavHost(
             navController = navController,
 
-            startDestination = "createTutorial",
+            startDestination = "home",
 
             modifier = Modifier.padding(paddingValues = padding),
 
@@ -238,10 +247,11 @@ class MainActivity : ComponentActivity() {
                 composable("createProject") {
                     CreateProjectScreen(editableProject, editableBlog)
                 }
+
                 composable("myProfile") {
                     CurrentUserProfileScreen()
                 }
-                composable("notificationsAndChats") {
+                composable("chats") {
                     NotificationsAndChats()
                 }
                 composable("chat") {
@@ -257,12 +267,6 @@ class MainActivity : ComponentActivity() {
                 }
                 composable("dashboard") {
                     DashBoard()
-                }
-                composable("tutorials") {
-                    Tutorials()
-                }
-                composable("createTutorial"){
-                    CreateTutorial()
                 }
                 composable("userProfile") {
                     if (userWatching != null) {
@@ -281,7 +285,12 @@ class MainActivity : ComponentActivity() {
                         WorkingOnProject(currentProjectInProgress!!)
                     }
                 }
-
+                composable("tutorials") {
+                    Tutorials()
+                }
+                composable("friendsAndFans") {
+                    FansAndFriends()
+                }
             })
     }
 
@@ -301,10 +310,12 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun Knitly(navController: NavHostController, modifier: Modifier = Modifier) {
         var expanded by remember { mutableStateOf(false) }
+        val currentRoute by navController.currentBackStackEntryAsState()
+        val currentDestination = currentRoute?.destination?.route
 
         val items = listOf(
             NavItemState(
-                title = "Home",
+                title = stringResource(R.string.home),
                 selectedIcon = Icons.Filled.Home,
                 unselectedIcon = Icons.Outlined.Home,
                 hasBadge = false,
@@ -312,16 +323,15 @@ class MainActivity : ComponentActivity() {
                 route = "home"
             ),
             NavItemState(
-                title = "Dashboard",
+                title = stringResource(R.string.dashboard),
                 selectedIcon = ImageVector.vectorResource(R.drawable.baseline_space_dashboard_24),
                 unselectedIcon = ImageVector.vectorResource(R.drawable.outline_space_dashboard_24),
                 hasBadge = false,
                 messages = 0,
                 route = "dashboard"
             ),
-
             NavItemState(
-                title = "Tutorials",
+                title = stringResource(R.string.tutorials),
                 selectedIcon = ImageVector.vectorResource(R.drawable.tutorials),
                 unselectedIcon = ImageVector.vectorResource(R.drawable.tutorials_outlined),
                 hasBadge = false,
@@ -344,19 +354,34 @@ class MainActivity : ComponentActivity() {
                             modifier.fillMaxWidth(),
                             contentAlignment = Alignment.Center
                         ) {
-                            if (navController.currentDestination?.route != "createProject") {
-                                Text(
-                                    text = "Artly",
-                                    fontWeight = FontWeight.Bold,
-                                    color = textColor
-                                )
+                            when (currentDestination) {
+                                "createProject" -> {
+                                    Text(
+                                        text = stringResource(R.string.createProject),
+                                        fontWeight = FontWeight.Bold,
+                                        color = textColor
+                                    )
+                                }
 
-                            } else {
-                                Text(
-                                    text = "Create Project",
-                                    fontWeight = FontWeight.Bold,
-                                    color = textColor
-                                )
+                                "chat" -> {
+
+                                }
+                                "workingOnProject" ->{
+                                    Text(
+                                        modifier = Modifier.widthIn(max = 300.dp).height(40.dp),
+                                        overflow = TextOverflow.Ellipsis,
+                                        text = currentProjectInProgress!!.project!!.projectData!!.title!!,
+                                        fontWeight = FontWeight.Bold,
+                                        color = textColor
+                                    )
+                                }
+                                else -> {
+                                    Text(
+                                        text = "Knitly",
+                                        fontWeight = FontWeight.Bold,
+                                        color = textColor
+                                    )
+                                }
                             }
 
                         }
@@ -367,44 +392,87 @@ class MainActivity : ComponentActivity() {
                         .padding(0.dp)
                         .clip(RoundedCornerShape(20.dp)),
                     navigationIcon = {
-                        Box(
-                            modifier = Modifier.padding(10.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
 
-                            AsyncImage(
-                                model = userData.value.profilePictureUrl,
-                                contentDescription = "Current User",
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .clickable {
-                                        expanded = !expanded
-                                    },
-                                contentScale = ContentScale.Crop
+                        if (currentDestination != "createProject" && currentDestination != "chat" && currentDestination != "workingOnProject") {
+                            Box(
+                                modifier = Modifier.padding(10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                AsyncImage(
+                                    model = if (userData.value.profilePictureUrl?.isNotEmpty() == true) userData.value.profilePictureUrl
+                                    else R.drawable.baseline_account_circle_24,
+                                    contentDescription = "Current User",
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .clickable {
+                                            expanded = !expanded
+                                        },
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                        } else if (currentDestination == "chat") {
+                            var user by remember { mutableStateOf(UserData()) }
+                            var online by remember { mutableStateOf(false) }
+                            chatOpened?.users?.forEach {
+                                if (it != userData.value.userId) {
+                                    FirebaseDB.getUser(it) { user = it }
+                                    FirebaseDB.isOnlineGet(it) { online = it }
+                                }
+                            }
 
-                            )
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                            ) {
+                                AsyncImage(
+                                    model = if (user.profilePictureUrl?.isNotEmpty() == true) user.profilePictureUrl
+                                    else R.drawable.baseline_account_circle_24,
+                                    contentDescription = "Current User",
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .align(Alignment.CenterVertically)
+                                        .clip(CircleShape)
+                                        .clickable {
+                                            userWatching = user
+                                            navController.navigate("userProfile")
+                                        },
+                                    contentScale = ContentScale.Crop
+
+                                )
+                                Spacer(Modifier.width(10.dp))
+                                Text(
+                                    modifier = Modifier.align(Alignment.Bottom),
+                                    text = user.name + (if (user.lastName?.isNotEmpty() == true) " " + user.lastName else "") + ", ",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp,
+                                    color = textColor
+                                )
+                                Text(
+                                    modifier = Modifier.align(Alignment.Bottom),
+                                    text = if (online) stringResource(R.string.isOnline) else stringResource(
+                                        R.string.notOnline
+                                    ),
+                                    fontWeight = FontWeight.Light,
+                                    fontSize = 16.sp,
+                                    color = if (online) headers_activeElement else textColor
+                                )
+                            }
                         }
                     },
                     actions = {
-                        IconButton(onClick = {
-                            navController.navigate("notificationsAndChats")
-                        }) {
-                            BadgedBox(badge = {
-                                Badge(
-                                    modifier.size(10.dp), containerColor = headers_activeElement
-                                ) {
-                                }
+                        if (currentDestination != "createProject" && currentDestination != "chat" && currentDestination != "workingOnProject") {
+
+                            IconButton(onClick = {
+                                navController.navigate("chats")
                             }) {
                                 Icon(
-                                    imageVector = Icons.Outlined.FavoriteBorder,
+                                    imageVector = ImageVector.vectorResource(R.drawable.round_message_24),
                                     tint = textColor,
                                     contentDescription = "Fav icon"
                                 )
+
                             }
-
                         }
-
                     },
                     colors = TopAppBarDefaults.smallTopAppBarColors(
                         containerColor = white
@@ -414,41 +482,43 @@ class MainActivity : ComponentActivity() {
 
             },
             bottomBar = {
-                NavigationBar(
-                    modifier
-                        .clip(RoundedCornerShape(20.dp, 20.dp)),
-                    containerColor = white
-                ) {
-                    items.forEachIndexed { index, item ->
-                        NavigationBarItem(
-                            selected = bottomNavState == index,
-                            onClick = {
-                                bottomNavState = index
-                                navController.navigate(item.route)
-                            },
-                            icon = {
-                                BadgedBox(badge = {
-                                    if (item.hasBadge) Badge(containerColor = headers_activeElement) { }
-                                    if (item.messages != 0) Badge(containerColor = headers_activeElement) {
-                                        Text(text = "${item.messages}")
+                if (currentDestination != "createProject" && currentDestination != "workingOnProject") {
+                    NavigationBar(
+                        modifier
+                            .clip(RoundedCornerShape(20.dp, 20.dp)),
+                        containerColor = white
+                    ) {
+                        items.forEachIndexed { index, item ->
+                            NavigationBarItem(
+                                selected = bottomNavState == index,
+                                onClick = {
+                                    bottomNavState = index
+                                    navController.navigate(item.route)
+                                },
+                                icon = {
+                                    BadgedBox(badge = {
+                                        if (item.hasBadge) Badge(containerColor = headers_activeElement) { }
+                                        if (item.messages != 0) Badge(containerColor = headers_activeElement) {
+                                            Text(text = "${item.messages}")
+                                        }
+                                    }) {
+                                        Icon(
+                                            tint = textColor,
+                                            imageVector = if (bottomNavState == index) item.selectedIcon
+                                            else item.unselectedIcon,
+                                            contentDescription = item.title
+                                        )
                                     }
-                                }) {
-                                    Icon(
-                                        tint = textColor,
-                                        imageVector = if (bottomNavState == index) item.selectedIcon
-                                        else item.unselectedIcon,
-                                        contentDescription = item.title
-                                    )
-                                }
 
-                            },
-                            label = { Text(text = item.title, color = textColor) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = white,
-                                selectedTextColor = textColor,
-                                indicatorColor = accent_secondary
+                                },
+                                label = { Text(text = item.title, color = textColor) },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = white,
+                                    selectedTextColor = textColor,
+                                    indicatorColor = accent_secondary
+                                )
                             )
-                        )
+                        }
                     }
                 }
             },
@@ -479,13 +549,16 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier
                                 .clickable {
                                     expanded = false
-                                    navController.navigate("myProfile")
+                                    if (currentDestination != "myProfile"){
+                                        navController.navigate("myProfile")
+                                    }
                                 }
                                 .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Image(
-                                painter = rememberAsyncImagePainter(userData.value.profilePictureUrl),
+                            AsyncImage(
+                                model = if (userData.value.profilePictureUrl?.isNotEmpty() == true) userData.value.profilePictureUrl
+                                else R.drawable.baseline_account_circle_24,
                                 contentDescription = null,
                                 modifier = Modifier
                                     .size(40.dp)
@@ -513,14 +586,13 @@ class MainActivity : ComponentActivity() {
                             color = Color(106, 78, 66, 70)
                         )
 
-
                         var account by remember { mutableStateOf<UserData?>(null) }
                         if (userData.value.linkedAccountsId.toString() != "") {
                             FirebaseDB.refUsers.child(userData.value.linkedAccountsId.toString())
                                 .get().addOnSuccessListener {
-                                account =
-                                    it.getValue<UserData>(UserData::class.java)
-                            }
+                                    account =
+                                        it.getValue<UserData>(UserData::class.java)
+                                }
                         }
                         if (account != null) {
                             Row(
@@ -529,7 +601,7 @@ class MainActivity : ComponentActivity() {
                                     .clickable {
                                         expanded = false
                                         var prefs =
-                                            getSharedPreferences("Prefs", Context.MODE_PRIVATE)
+                                            getSharedPreferences("Prefs", MODE_PRIVATE)
                                         val editor = prefs.edit()
                                         editor.putString("idSelected", account!!.userId)
                                         editor.apply()

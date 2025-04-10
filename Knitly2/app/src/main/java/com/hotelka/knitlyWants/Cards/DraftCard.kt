@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -44,6 +45,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
@@ -56,6 +58,7 @@ import com.hotelka.knitlyWants.R
 import com.hotelka.knitlyWants.editableBlog
 import com.hotelka.knitlyWants.editableProject
 import com.hotelka.knitlyWants.navController
+import com.hotelka.knitlyWants.toDateTimeString
 import com.hotelka.knitlyWants.ui.theme.accent_secondary
 import com.hotelka.knitlyWants.ui.theme.headers_activeElement
 import com.hotelka.knitlyWants.ui.theme.textColor
@@ -107,10 +110,13 @@ fun DraftCard(project: Project? = Project(), blog: Blog? = Blog()) {
                     Text(
                         text = projectData!!.title!!,
                         modifier = Modifier
-                            .width(150.dp),
-                        fontSize = 24.sp,
-                        color = textColor
-
+                            .width(250.dp)
+                            .heightIn(0.dp, 50.dp)
+                            .padding(5.dp),
+                        overflow = TextOverflow.Ellipsis,
+                        fontSize = 18.sp,
+                        color = textColor,
+                        fontWeight = FontWeight.Bold
                     )
                     Row(
                         modifier = Modifier
@@ -126,7 +132,7 @@ fun DraftCard(project: Project? = Project(), blog: Blog? = Blog()) {
                             colorFilter = ColorFilter.tint(textColor)
                         )
                         Text(
-                            text = stringResource(R.string.lastUpdate) + projectData!!.date,
+                            text = stringResource(R.string.lastUpdate) + projectData!!.date?.toDateTimeString(),
                             fontSize = 12.sp,
                             modifier = Modifier
                                 .align(Alignment.CenterVertically)
@@ -189,7 +195,8 @@ fun DraftCard(project: Project? = Project(), blog: Blog? = Blog()) {
                         }
 
                         Text(
-                            modifier = Modifier.padding(horizontal = 5.dp),
+                            modifier = Modifier.padding(horizontal = 5.dp).heightIn(0.dp, 80.dp),
+                            overflow = TextOverflow.Ellipsis,
                             text = projectData!!.description,
                             color = textColor,
                             fontSize = 16.sp,

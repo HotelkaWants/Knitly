@@ -213,7 +213,7 @@ fun WorkingOnProject(project: ProjectsArchive = ProjectsArchive()) {
                     )
                 }
             }
-            LazyColumn() {
+            LazyColumn {
                 item {
                     AnimatedVisibility(
                         visible = infoExpanded,
@@ -297,7 +297,6 @@ fun WorkingOnProject(project: ProjectsArchive = ProjectsArchive()) {
                                             disabledContainerColor = Transparent,
                                             disabledLabelColor = textColor
                                         ),
-                                        label = { Text(stringResource(R.string.title)) },
                                     )
                                 }
                             }
@@ -318,7 +317,6 @@ fun WorkingOnProject(project: ProjectsArchive = ProjectsArchive()) {
                                     disabledLabelColor = textColor
                                 ),
                                 textStyle = TextStyle(fontSize = 16.sp),
-                                label = { Text(stringResource(R.string.description)) }
                             )
                             Row(
                                 Modifier
@@ -365,7 +363,6 @@ fun WorkingOnProject(project: ProjectsArchive = ProjectsArchive()) {
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(20.dp)),
-                                    label = { Text(stringResource(R.string.yarns)) },
                                     colors = TextFieldDefaults.colors(
                                         disabledTextColor = textColor,
                                         disabledContainerColor = textFieldColor,

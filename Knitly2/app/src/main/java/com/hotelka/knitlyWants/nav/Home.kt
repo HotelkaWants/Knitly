@@ -55,9 +55,13 @@ fun HomeScreen() {
     val context = LocalContext.current
     val db = SupportingDatabase(context)
     var projects by remember { mutableStateOf(db.getAllProjects()) }
-    Log.d("projectsHome", db.getAllProjects().toString())
-    var blogs = db.getAllBlog()
+    var blogs  by remember { mutableStateOf(db.getAllBlog()) }
     var refreshing by remember { mutableStateOf(true) }
+
+    FirebaseDB.createSupportingDatabase(context)
+    projects = db.getAllProjects()
+    blogs = db.getAllBlog()
+    users.value = db.getAllUsers()
 
     LaunchedEffect(refreshing) {
         if (refreshing) {
@@ -115,7 +119,7 @@ fun HomeScreen() {
                     )
                 }
                 item {
-                    LazyRow(modifier = Modifier.padding(10.dp)) {
+                    LazyRow(modifier = Modifier) {
                         itemsIndexed(blogs) { index, blog ->
                             BlogCard(blog)
                         }
@@ -142,7 +146,9 @@ fun HomeScreen() {
                 itemsIndexed(
                     projects,
                     key = { index, item -> item.projectData!!.projectId!! }) { index, project ->
-                    ProjectContainer(project, false)
+                    var author by remember { mutableStateOf(UserData()) }
+                    FirebaseDB.getUser(project.projectData!!.authorID.toString()){author = it}
+                    ProjectContainer(project, author)
                 }
             }
             FloatingActionButton(
@@ -185,7 +191,7 @@ fun UserItem(user: UserData = UserData()) {
             },
         content = {
             Box {
-                if (user.profilePictureUrl != null) {
+                if (user.profilePictureUrl?.isNotEmpty() == true) {
                     AsyncImage(
                         model = user.profilePictureUrl,
                         modifier = Modifier

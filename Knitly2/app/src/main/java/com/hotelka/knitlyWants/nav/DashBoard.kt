@@ -64,6 +64,7 @@ import kotlinx.coroutines.delay
 @Preview
 @Composable
 fun DashBoard() {
+
     var usersDrafts = remember { mutableStateListOf<Any>() }
     usersDrafts.apply {
         clear()
@@ -84,8 +85,8 @@ fun DashBoard() {
         }
     }
     LaunchedEffect(Unit) {
+        projectsInProgress.clear()
         FirebaseDB.collectCurrentUserProjectsWorks { project ->
-            projectsInProgress.clear()
             projectsInProgress.add(project)
             if (project.progress == 1f) projectsCompletedCount++
             else projectsInProgressCount++

@@ -1,9 +1,7 @@
 package com.hotelka.knitlyWants.nav
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.net.Uri
-import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -53,7 +51,6 @@ import androidx.compose.ui.graphics.Color.Companion.Gray
 import androidx.compose.ui.graphics.Color.Companion.Transparent
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -111,13 +108,8 @@ import com.hotelka.knitlyWants.ui.theme.textFieldColor
 import com.hotelka.knitlyWants.ui.theme.white
 import com.hotelka.knitlyWants.userData
 import kotlinx.coroutines.launch
-import org.apache.commons.lang3.RandomStringUtils
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.FileOutputStream
 import java.lang.Exception
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -130,10 +122,10 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
     var title by remember { mutableStateOf(if (currentProject != null) currentProject.projectData!!.title else if (blog_ != null) blog_.projectData!!.title else "") }
 
     var description by remember { mutableStateOf(if (currentProject != null) currentProject.projectData!!.description else if (blog_ != null) blog_.projectData!!.description else "") }
-    var category by remember { mutableStateOf(if (currentProject != null) currentProject.category else if(blog_ != null) blog_.category else Category.Knitting) }
+    var category by remember { mutableStateOf(if (currentProject != null) currentProject.category else if (blog_ != null) blog_.category else Category.Blog) }
     var credits by remember { mutableStateOf(if (currentProject != null) currentProject.credits else if (blog_ != null) blog_.credits else "") }
     var initialImageUri =
-        if (currentProject != null) currentProject.projectData?.cover else blog_?.projectData?.cover
+        if (currentProject != null) currentProject.projectData?.cover else if (blog_ != null)  blog_.projectData?.cover else ""
 
     var tool by remember {
         mutableDoubleStateOf(
@@ -182,7 +174,7 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
     var lastRow by remember { mutableIntStateOf(lastDetail.rows.size) }
 
     var lastStep by remember { mutableIntStateOf(steps.last().rows.size) }
-    var pattern: PatternData by remember { mutableStateOf(PatternData()) }
+    var pattern: PatternData? by remember { mutableStateOf(null) }
 
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
@@ -193,21 +185,23 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
 
     if (blog_ != null) {
         blog = blog_
-        blogImages.apply {
-            clear()
-            addAll(blog.additionalImages)
+        if (blogImages.isEmpty()) {
+            blogImages.addAll(blog.additionalImages)
         }
     }
+    var loading by remember { mutableStateOf(false) }
+
     val imageCropper = rememberImageCropper()
     val composableScope = rememberCoroutineScope()
     var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
     val cropState = imageCropper.cropState
     var knittingPatternConstructorEnabled by remember { mutableStateOf(false) }
-    var patternId by remember { mutableStateOf<String?>(null) }
+    var patternId by remember { mutableStateOf<String?>(currentProject?.patternId) }
 
-    patternId?.let {
-        FirebaseDB.getPattern(it, userData.value.userId) {
+    if (patternId?.isNotEmpty() == true){
+        FirebaseDB.getPattern(patternId.toString(), userData.value.userId) {
             pattern = it
+            loading = false
         }
     }
 
@@ -258,7 +252,7 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
 
     var loadingEnabled by remember { mutableStateOf(false) }
     var calculator by remember { mutableStateOf(false) }
-    var calculateValue by remember { mutableStateOf("Increases") }
+    var calculateValue by remember { mutableStateOf(context.getString(R.string.increases)) }
 
     Box(
         modifier = Modifier
@@ -420,32 +414,6 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                     }
                                 }
                                 Box {
-                                    Row {
-                                        AnimatedVisibility(
-                                            visible = creditsInfoExpanded,
-                                            enter = fadeIn() + scaleIn(),
-                                            exit = fadeOut() + scaleOut(),
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .padding(vertical = 10.dp)
-                                                    .padding(end = 50.dp)
-                                                    .background(
-                                                        white,
-                                                        RoundedCornerShape(
-                                                            20.dp
-                                                        )
-                                                    )
-                                                    .wrapContentWidth()
-                                                    .padding(12.dp)
-                                            ) {
-                                                Text(
-                                                    text = stringResource(R.string.priceInfo),
-                                                    color = textColor
-                                                )
-                                            }
-                                        }
-                                    }
 
                                     TextField(
                                         value = title!!,
@@ -490,75 +458,77 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                 }
                             }
                         }
-                        Box {
-                            TextField(
-                                value = credits!!,
-                                onValueChange = { credits = it },
-                                modifier = Modifier
-                                    .background(textFieldColor)
-                                    .padding(10.dp)
-                                    .fillMaxWidth()
-                                    .wrapContentHeight()
-                                    .clip(RoundedCornerShape(20.dp)),
-                                colors = TextFieldDefaults.colors(
-                                    unfocusedTextColor = textColor,
-                                    focusedTextColor = textColor,
-                                    focusedContainerColor = textFieldColor,
-                                    unfocusedContainerColor = textFieldColor,
-                                    unfocusedLabelColor = DarkGray,
-                                    focusedLabelColor = DarkGray
-                                ),
-                                textStyle = TextStyle(fontSize = 14.sp),
-                                label = { Text(stringResource(R.string.credits)) },
-                                trailingIcon = {
-                                    Row {
+                    }
 
-                                        IconButton(
-                                            onClick = {
-                                                creditsInfoExpanded = !creditsInfoExpanded
-                                            },
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Filled.Info,
-                                                contentDescription = "Error",
-                                                tint = Gray
-                                            )
-                                        }
+                }
+                item {
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(topEnd = 10.dp, topStart = 10.dp))
+                    ) {
+                        TextField(
+                            value = credits!!,
+                            onValueChange = { credits = it },
+                            modifier = Modifier
+                                .background(textFieldColor)
+                                .padding(10.dp)
+                                .fillMaxWidth()
+                                .wrapContentHeight(),
+                            colors = TextFieldDefaults.colors(
+                                unfocusedTextColor = textColor,
+                                focusedTextColor = textColor,
+                                focusedContainerColor = textFieldColor,
+                                unfocusedContainerColor = textFieldColor,
+                                unfocusedLabelColor = DarkGray,
+                                focusedLabelColor = DarkGray
+                            ),
+                            textStyle = TextStyle(fontSize = 14.sp),
+                            label = { Text(stringResource(R.string.credits)) },
+                            trailingIcon = {
+                                Row {
 
-                                    }
-                                }
-                            )
-                            Row(Modifier.align(Alignment.TopEnd)) {
-                                AnimatedVisibility(
-                                    visible = creditsInfoExpanded,
-                                    enter = fadeIn() + scaleIn(),
-                                    exit = fadeOut() + scaleOut(),
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .padding(vertical = 10.dp)
-                                            .padding(end = 50.dp)
-                                            .background(
-                                                white,
-                                                RoundedCornerShape(
-                                                    20.dp
-                                                )
-                                            )
-                                            .wrapContentWidth()
-                                            .padding(12.dp)
+                                    IconButton(
+                                        onClick = {
+                                            creditsInfoExpanded = !creditsInfoExpanded
+                                        },
                                     ) {
-                                        Text(
-                                            text = stringResource(R.string.leaveCredits),
-                                            color = textColor
+                                        Icon(
+                                            imageVector = Icons.Filled.Info,
+                                            contentDescription = "Error",
+                                            tint = Gray
                                         )
                                     }
+
+                                }
+                            }
+                        )
+                        Row(Modifier.align(Alignment.TopEnd)) {
+                            AnimatedVisibility(
+                                visible = creditsInfoExpanded,
+                                enter = fadeIn() + scaleIn(),
+                                exit = fadeOut() + scaleOut(),
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .padding(vertical = 10.dp)
+                                        .padding(end = 50.dp)
+                                        .background(
+                                            white,
+                                            RoundedCornerShape(
+                                                20.dp
+                                            )
+                                        )
+                                        .wrapContentWidth()
+                                        .padding(12.dp)
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.leaveCredits),
+                                        color = textColor
+                                    )
                                 }
                             }
                         }
-
-
                     }
-
                 }
                 item {
                     TextField(
@@ -844,7 +814,7 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
 
                                     ) {
                                         if (expandedRows[indexD]) {
-                                            Box() {
+                                            Box {
                                                 Column(
                                                     modifier = Modifier.background(
                                                         textFieldColor
@@ -1400,7 +1370,7 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
 
                                         ) {
                                             if (expandedSteps) {
-                                                Box() {
+                                                Box {
                                                     Column(
                                                         modifier = Modifier.background(
                                                             textFieldColor
@@ -1784,15 +1754,17 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                 ) {
                                     Text(
                                         stringResource(
-                                            if (pattern.gridState.isNotEmpty()) R.string.createNewPattern
+                                            if (pattern?.gridState?.isNotEmpty() == true) R.string.createNewPattern
                                             else R.string.createPattern
                                         )
                                     )
                                 }
-                                if (pattern.gridState.isNotEmpty()) PatternGrid(
-                                    pattern.columns,
-                                    pattern.gridState.toTypedArray()
-                                ) { }
+                                if (patternId?.isNotEmpty() == true && pattern == null) loading = true
+                                if (pattern != null)
+                                    PatternGrid(
+                                        pattern!!.columns,
+                                        pattern!!.gridState.toTypedArray()
+                                    ) { }
 
                             }
                         }
@@ -1805,6 +1777,7 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                     uri?.let { blogImages.add(it.toString()) }
                                     blog =
                                         blog.copy(additionalImages = blogImages.toMutableList())
+                                    Log.d("images", blogImages.toString())
                                 }
                             LazyRow(
                                 modifier = Modifier
@@ -1813,7 +1786,7 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                     .heightIn(0.dp, 200.dp)
                             ) {
 
-                                itemsIndexed(blog.additionalImages) { indexI, uri ->
+                                itemsIndexed(blogImages) { indexI, uri ->
 
                                     AsyncImage(
                                         model = uri,
@@ -1877,10 +1850,6 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
         val uniqueUUID = UUID.randomUUID().toString()
         fun saveProject() {
             loadingEnabled = true
-            val now = LocalDateTime.now()
-            val formatter = DateTimeFormatter.ofPattern("HH:mm, dd.MM.yyyy ")
-            val formatted = now.format(formatter)
-
             if (category == Category.Blog) {
                 composableScope.launch {
                     var newImagesList = mutableListOf<String?>()
@@ -1895,17 +1864,15 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                             else 0,
                             projectId = if (blog_ != null) blog_.projectData!!.projectId
                             else uniqueUUID,
-                            title = title!!.trim(),
+                            title = title?.trimIndent(),
                             date = if (blog_ != null) blog_.projectData!!.date
-                            else formatted,
+                            else System.currentTimeMillis(),
                             description = description,
-                            author = userData.value.username!!,
                             authorID = userData.value.userId,
                             cover = if (imageBitmap != null) getData(
                                 "blogs",
                                 uploadFile(
                                     "blogs",
-                                    userData.value.username!!,
                                     imageBitmapToByteArray(imageBitmap!!)
                                 ).toString()
                             ) else initialImageUri
@@ -1927,7 +1894,6 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                                         "projects",
                                                         uploadFile(
                                                             "projects",
-                                                            userData.value.username!!,
                                                             it.readBytes()
                                                         ).toString()
                                                     )
@@ -1964,20 +1930,15 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                             else 0,
                             projectId = if (currentProject != null) currentProject.projectData!!.projectId
                             else uniqueUUID,
-                            title = if (title?.get(0) == ' ') title!!.removeRange(
-                                0,
-                                0
-                            ) else title!!,
+                            title = title?.trimIndent(),
                             date = if (currentProject != null) currentProject.projectData!!.date
-                            else formatted,
+                            else System.currentTimeMillis(),
                             description = description,
-                            author = userData.value.username!!,
                             authorID = userData.value.userId,
                             cover = if (imageBitmap != null) getData(
                                 "projects",
                                 uploadFile(
                                     "projects",
-                                    userData.value.username!!,
                                     imageBitmapToByteArray(imageBitmap!!)
                                 ).toString()
                             ) else initialImageUri,
@@ -2007,7 +1968,6 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                                                                 "projects",
                                                                 uploadFile(
                                                                     "projects",
-                                                                    userData.value.username!!,
                                                                     file.readBytes()
                                                                 ).toString()
                                                             )
@@ -2027,7 +1987,7 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                         })
                     if (currentProject != null) {
                         FirebaseDB.updateProject(project)
-                    } else FirebaseDB.storeProjectCrocheting(project, uniqueUUID)
+                    } else FirebaseDB.storeProject(project, uniqueUUID)
                     try {
                         SupportingDatabase(context).deleteDraft(project)
                     } catch (_: Exception) {
@@ -2041,153 +2001,133 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
 
         fun saveDraft() {
             loadingEnabled = true
-            val now = LocalDateTime.now()
-            val formatter = DateTimeFormatter.ofPattern("HH:mm, dd.MM.yyyy ")
-            val formatted = now.format(formatter)
-            var file = context.getDir("Covers", Context.MODE_PRIVATE)
-            file = File(file, "${RandomStringUtils.randomAlphanumeric(15)}.jpg")
+            composableScope.launch {
+                var guide = if (category == Category.Knitting) steps else details
+                when (category) {
+                    Category.Blog -> {
+                        composableScope.launch {
+                            var newImagesList = mutableListOf<String?>()
+                            val blog = Blog(
+                                credits = credits,
+                                category = category,
+                                projectData = ProjectData(
+                                    likes = if (blog_ != null) blog_.projectData!!.likes
+                                    else Likes(),
+                                    reviews = if (blog_ != null) blog_.projectData!!.reviews
+                                    else 0,
+                                    projectId = if (blog_ != null) blog_.projectData!!.projectId
+                                    else uniqueUUID,
+                                    title = title?.trimIndent(),
+                                    date = if (blog_ != null) blog_.projectData!!.date
+                                    else System.currentTimeMillis(),
+                                    description = description,
+                                    authorID = userData.value.userId,
+                                    cover = if (imageBitmap != null) getData(
+                                        "blogs",
+                                        uploadFile(
+                                            "blogs",
+                                            imageBitmapToByteArray(imageBitmap!!)
+                                        ).toString()
+                                    ) else initialImageUri
 
-            imageBitmap?.let {
-                val stream = ByteArrayOutputStream()
-                it.asAndroidBitmap()
-                    .compress(Bitmap.CompressFormat.PNG, 100, stream) // Use PNG or JPEG format
-                val byteArray: ByteArray = stream.toByteArray()
-                FileOutputStream(file).use { outputStream ->
-                    outputStream.write(byteArray)
-                }
-                Log.i("ImageSaving", file.absolutePath)
-
-            }
-            when (category) {
-                Crocheting -> {
-
-                    val project = Project(
-                        credits = credits,
-                        category = category,
-                        projectData = ProjectData(
-                            projectId = if (currentProject != null) currentProject.projectData!!.projectId else uniqueUUID,
-                            title = if (title?.get(0) == ' ') title!!.removeRange(
-                                0,
-                                0
-                            ) else title!!,
-                            date = formatted,
-                            description = description,
-                            author = userData.value.username!!,
-                            authorID = userData.value.userId,
-                            cover = if (imageBitmap != null)
-                                file.absolutePath
-                            else initialImageUri,
-                        ),
-                        tool = "${tool}mm",
-                        yarns = yarns,
-                        details = details.apply {
-                            this.forEach { detail ->
-                                detail.rows.forEach { row ->
-                                    if (row.noteAdded) {
-                                        var newNoteList = mutableListOf<String?>()
-                                        row.note?.imageUrl?.forEachIndexed { index, string ->
-                                            if (string != null && string != "null" && string != "") {
-                                                var file =
-                                                    context.getDir(
-                                                        "Covers",
-                                                        Context.MODE_PRIVATE
+                                ),
+                                additionalImages = newImagesList.apply {
+                                    blogImages.forEach { imageUri ->
+                                        if (imageUri != null && imageUri != "null" && imageUri != "") {
+                                            var file: File? = null
+                                            if (!imageUri.contains("cxyqsghvgdqyxrjnvrxn.supabase.co")) {
+                                                file =
+                                                    getFileFromUri(
+                                                        context,
+                                                        Uri.parse(imageUri)
                                                     )
-                                                file = File(
-                                                    file,
-                                                    "${
-                                                        RandomStringUtils.randomAlphanumeric(
-                                                            15
+                                                file?.let {
+                                                    newImagesList.add(
+                                                        getData(
+                                                            "blogs",
+                                                            uploadFile(
+                                                                "blogs",
+                                                                file.readBytes()
+                                                            ).toString()
                                                         )
-                                                    }.jpg"
-                                                )
-                                                val out = FileOutputStream(file)
-                                                val bitmap =
-                                                    MediaStore.Images.Media.getBitmap(
-                                                        context.contentResolver,
-                                                        Uri.parse(string)
-                                                    );
-                                                bitmap.compress(
-                                                    Bitmap.CompressFormat.JPEG,
-                                                    85,
-                                                    out
-                                                )
-                                                out.flush()
-                                                out.close()
-                                                newNoteList.add(file.absolutePath)
-                                                row.note?.imageUrl = newNoteList
-                                            }
+                                                    )
+                                                }
+                                            } else newImagesList.add(imageUri)
+
                                         }
-                                    } else {
-                                        row.note = null
                                     }
-                                }
-                            }
-                        })
-                    if (currentProject != null) {
+                                })
+                            if (blog_ != null) {
+                                SupportingDatabase(context).updateBlogDraft(blog)
+                            } else SupportingDatabase(context).addBlogDraft(blog, uniqueUUID)
+                            navController.popBackStack()
+                        }
+                    }
 
-                        Log.d(
-                            "ImageSaving",
-                            SupportingDatabase(context).updateDraft(project).toString()
-                        )
-                    } else SupportingDatabase(context).addProjectDraft(project, uniqueUUID)
-
-                    navController.popBackStack()
-
-
-                }
-
-                Category.Blog -> {
-                    composableScope.launch {
-                        var newImagesList = mutableListOf<String?>()
-                        val blog = Blog(
+                    else -> {
+                        val project = Project(
                             credits = credits,
                             category = category,
+                            patternId = if (category == Category.Knitting) patternId else "",
                             projectData = ProjectData(
-                                likes = if (currentProject != null) currentProject.projectData!!.likes
-                                else Likes(),
-                                reviews = if (currentProject != null) currentProject.projectData!!.reviews
-                                else 0,
-                                projectId = if (currentProject != null) currentProject.projectData!!.projectId
-                                else uniqueUUID,
-                                title = if (title?.get(0) == ' ') title!!.removeRange(
-                                    0,
-                                    0
-                                ) else title!!,
-                                date = if (currentProject != null) currentProject.projectData!!.date
-                                else formatted,
+                                projectId = if (currentProject != null) currentProject.projectData!!.projectId else uniqueUUID,
+                                title = title?.trimIndent(),
+                                date = System.currentTimeMillis(),
                                 description = description,
-                                author = userData.value.username!!,
                                 authorID = userData.value.userId,
-                                cover = if (imageBitmap != null)
-                                    file.absolutePath
-                                else initialImageUri
+                                cover = if (imageBitmap != null) getData(
+                                    "projects",
+                                    uploadFile(
+                                        "projects",
+                                        imageBitmapToByteArray(imageBitmap!!)
+                                    ).toString()
+                                ) else initialImageUri,
                             ),
-                            additionalImages = newImagesList.apply {
-                                blogImages.forEach { imageUri ->
-                                    if (imageUri != null && imageUri != "null" && imageUri != "") {
-                                        var file =
-                                            context.getDir("Covers", Context.MODE_PRIVATE)
-                                        file = File(
-                                            file,
-                                            "${RandomStringUtils.randomAlphanumeric(15)}.jpg"
-                                        )
-                                        val out = FileOutputStream(file)
-                                        val bitmap = MediaStore.Images.Media.getBitmap(
-                                            context.contentResolver,
-                                            Uri.parse(imageUri)
-                                        );
-                                        bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
-                                        out.flush()
-                                        out.close()
-                                        newImagesList.add(file.absolutePath)
+                            tool = "${tool}mm",
+                            yarns = yarns,
+                            details = guide.apply {
+                                this.forEach { detail ->
+                                    detail.rows.forEach { row ->
+                                        if (row.noteAdded) {
+                                            var newNoteList = mutableListOf<String?>()
+                                            row.note?.imageUrl?.forEachIndexed { index, imageUri ->
+                                                if (imageUri != null && imageUri != "null" && imageUri != "") {
+                                                    var file: File? = null
+                                                    if (!imageUri.contains("cxyqsghvgdqyxrjnvrxn.supabase.co")) {
+                                                        file =
+                                                            getFileFromUri(
+                                                                context,
+                                                                Uri.parse(imageUri)
+                                                            )
+                                                        file?.let {
+                                                            newNoteList.add(
+                                                                getData(
+                                                                    "projects",
+                                                                    uploadFile(
+                                                                        "projects",
+                                                                        file.readBytes()
+                                                                    ).toString()
+                                                                )
+                                                            )
+                                                        }
+                                                    } else newNoteList.add(imageUri)
 
+                                                }
+                                            }
+                                            row.note?.imageUrl = newNoteList
+                                        } else {
+                                            row.note = null
+                                        }
                                     }
                                 }
                             })
-                        if (blog_ != null) {
-                            SupportingDatabase(context).updateBlogDraft(blog)
-                        } else SupportingDatabase(context).addBlogDraft(blog, uniqueUUID)
+                        if (currentProject != null) {
+                            SupportingDatabase(context).updateDraft(project).toString()
+                        } else SupportingDatabase(context).addProjectDraft(project, uniqueUUID)
+
                         navController.popBackStack()
+
+
                     }
                 }
             }
@@ -2238,11 +2178,11 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
                     },
                     calculatorDecrease = {
                         calculator = true
-                        calculateValue = "Decreases"
+                        calculateValue = context.getString(R.string.decreases)
                     },
                     calculatorIncrease = {
                         calculator = true
-                        calculateValue = "Increases"
+                        calculateValue = context.getString(R.string.increases)
                     },
                     fabIcon = ImageVector.vectorResource(R.drawable.calculator),
                 )
@@ -2327,7 +2267,9 @@ fun CreateProjectScreen(currentProject: Project? = null, blog_: Blog? = null) {
         if (knittingPatternConstructorEnabled) KnittingPatternConstructor {
             knittingPatternConstructorEnabled = false; patternId = it
         }
-
+        if (loading) {
+            LoadingAnimation()
+        }
     }
 
 }
@@ -2567,9 +2509,9 @@ fun Calculator(
                         isError = valuesError,
                         label = {
                             Text(
-                                if (valuesError) stringResource(R.string.calculate) + " $calculateValue* " +
+                                if (valuesError) "$calculateValue " +
                                         "${stringResource(R.string.mustBeLess)} $stitchesAmount"
-                                else stringResource(R.string.calculate) + " $calculateValue"
+                                else calculateValue
                             )
                         }
 
@@ -2734,10 +2676,11 @@ fun Calculator(
                         colors = ButtonDefaults.buttonColors(containerColor = headers_activeElement),
                         onClick = {
                             if (!errorStitches && !valuesError) {
-                                result = if (calculateValue == "Increases") {
+                                result = if (calculateValue == context.getString(R.string.increases)) {
                                     distributeIncreases(
-                                    context, stitchesAmount, valuesCalculate, selectedOptionText
-                                )} else {
+                                        context, stitchesAmount, valuesCalculate, selectedOptionText
+                                    )
+                                } else {
                                     distributeDecreases(
                                         context, stitchesAmount, valuesCalculate, selectedOptionText
                                     )

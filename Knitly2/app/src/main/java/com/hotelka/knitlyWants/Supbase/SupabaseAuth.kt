@@ -57,7 +57,7 @@ suspend fun signUp(email: String, password: String): UserInfo? {
 
 suspend fun signIn(email: String, password: String): UserInfo? {
     try {
-        val result = supabase.auth.signInWith(Email){
+        supabase.auth.signInWith(Email){
             this.email = email
             this.password = password
         }

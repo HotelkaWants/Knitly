@@ -50,7 +50,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -69,7 +71,6 @@ import com.hotelka.knitlyWants.ui.theme.headers_activeElement
 import com.hotelka.knitlyWants.ui.theme.textColor
 import com.hotelka.knitlyWants.ui.theme.textFieldColor
 import com.hotelka.knitlyWants.ui.theme.white
-import com.hotelka.knitlyWants.userData
 import kotlinx.coroutines.launch
 import java.nio.charset.StandardCharsets
 
@@ -234,7 +235,6 @@ suspend fun savePatternToJSON(
     val fileName = getData(
         "patterns", uploadFile(
             bucket = "patterns",
-            userID = userData.value.userId,
             file = data,
             extension = ".json"
         ).toString()
@@ -303,39 +303,110 @@ private fun HorizontalScrollableGrid(
         modifier = Modifier
             .horizontalScroll(scrollState)
     ) {
-        LazyVerticalGrid(
-            modifier = Modifier
-                .heightIn(0.dp, 2000.dp)
-                .width((cellSize * columns)),
-            columns = GridCells.Fixed(columns),
-            content = {
-                itemsIndexed(gridState) { index, cell ->
-                    Box(
-                        modifier = Modifier
-                            .size(cellSize)
-                            .background(cell.color ?: Color.White)
-                            .border(1.dp, DarkGray)
-                            .clickable { onCellClick(index) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        cell.stitchType?.symbol?.let {
-                            cell.color?.luminance()?.let { it1 ->
-                                Image(
-                                    imageVector = ImageVector.vectorResource(it),
-                                    contentDescription = "StitchSymbol",
-                                    colorFilter = ColorFilter.tint(
-                                        if (it1 < 0.5f) white
-                                        else textColor
-                                    )
-                                )
+        Column {
+            Row {
+                for (i in 0..columns + 1) {
+                    Box {
+                        Text(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .background(basic),
+                            text = if (i != 0 && i != columns + 1) i.toString() else "",
+                            color = textColor,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+            Row {
+                Column {
+                    for (i in 1..gridState.size.div(columns)) {
+                        Box {
+                            Text(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .background(basic),
+                                text = i.toString(),
+                                color = textColor,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+
+                            )
+                        }
+                    }
+                }
+                LazyVerticalGrid(
+                    modifier = Modifier
+                        .heightIn(0.dp, 2000.dp)
+                        .width((cellSize * columns)),
+                    columns = GridCells.Fixed(columns),
+                    content = {
+                        itemsIndexed(gridState) { index, cell ->
+                            Box(
+                                modifier = Modifier
+                                    .size(cellSize)
+                                    .background(cell.color ?: Color.White)
+                                    .border(1.dp, DarkGray)
+                                    .clickable { onCellClick(index) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                cell.stitchType?.symbol?.let {
+                                    cell.color?.luminance()?.let { it1 ->
+                                        Image(
+                                            imageVector = ImageVector.vectorResource(it),
+                                            contentDescription = "StitchSymbol",
+                                            colorFilter = ColorFilter.tint(
+                                                if (it1 < 0.5f) white
+                                                else textColor
+                                            )
+                                        )
+                                    }
+                                }
                             }
+                        }
+                    }
+                )
+                Column {
+                    for (i in 1..gridState.size.div(columns)) {
+                        Box {
+                            Text(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .background(basic),
+                                text = i.toString(),
+                                color = textColor,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+
+                            )
                         }
                     }
                 }
             }
-        )
+            Row {
+                for (i in 0..columns + 1) {
+                    Box {
+                        Text(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .background(basic),
+                            text = if (i != 0 && i != columns + 1) i.toString() else "",
+                            color = textColor,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+        }
     }
 }
+
 enum class StitchType(val symbol: Int, val displayName: String) {
     None(R.drawable.empty, "Empty"),
     EdgeStitch(R.drawable.edge_stitch, "Edge Stitch"),

@@ -39,19 +39,14 @@ private val urlPattern: Pattern = Pattern.compile(
 )
 
 fun extractUrls(text: String): List<LinkInfos> {
-    val matcher = urlPattern.matcher(text)
-    var matchStart: Int
-    var matchEnd: Int
-    val links = arrayListOf<LinkInfos>()
-    while (matcher.find()) {
-        matchStart = matcher.start(1)
-        matchEnd = matcher.end()
-        var url = text.substring(matchStart, matchEnd)
-        if (!url.startsWith("http://") && !url.startsWith("https://"))
-            url = "https://$url"
-        links.add(LinkInfos(url, matchStart, matchEnd))
+    val urls = mutableListOf<LinkInfos>()
+    val urlRegex = "(https?://[^\\s]+)".toRegex()  // Matches URLs
+
+    urlRegex.findAll(text).forEach { matchResult ->
+        urls.add(LinkInfos(matchResult.value, matchResult.range.first, matchResult.range.last + 1))
     }
-    return links
+
+    return urls
 }
 
 data class LinkInfos(
@@ -82,8 +77,18 @@ fun formatNumber(number: Int): String {
         else -> "%.1fm".format(number / 1000000.0)
     }.replace(".0", "")
 }
+fun Long.toDateTimeString():String{
+    val date = Date(if (this.toString().length > 10) this else this * 1000)
+    val format = SimpleDateFormat("HH:mm, dd.MM.yyyy", Locale.getDefault())
+    return format.format(date)
+}
+fun Long.toDateString():String{
+    val date = Date(if (this.toString().length > 10) this else this * 1000)
+    val format = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+    return format.format(date)
+}
 fun Long.toTimeString():String{
-    val date = Date(this)
+    val date = Date(if (this.toString().length > 10) this else this * 1000)
     val format = SimpleDateFormat("HH:mm", Locale.getDefault())
     return format.format(date)
 }
